@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description:  This template deploys an AWS Distributor Package for the AWS X-Ray Daemon.
+Parameters:
+  S3BucketURL:
+    Description: S3 Bucket for Package
+    Type: String
+    Default: https://s3.amazonaws.com/nizamiks3test/testpackage
+  XRayWindowsHash:
+    Description: MD5 Hash for Windows XRay Package
+    Type: String
+    Default: PPGqKsV3M//PcO1GGwMYNg==
+  XRayLinuxHash:
+    Description: MD5 Hash for Linux XRay Package
+    Type: String
+    Default: IgRbhVvZ2aQc3oAkDocV6Q==
+
+Resources:
+  AWSXRayDaemonPackage:
+    Type: AWS::SSM::Document
+    Properties:
+      DocumentType: Package
+      Name: AWSXRayDaemon2
+      VersionName: 3.x
+      Content:
+        schemaVersion: '2.0'
+        version: 3.x
+        publisher: Amazon Web Services
+        packages:
+          windows:
+            _any:
+              x86_64:
+                file: aws-xray-daemon-windows-service-3.x.zip
+          amazon:
+            _any:
+              x86_64:
+                file: xray.rpm
+          ubuntu:
+            _any:
+              x86_64:
+                file: xray.rpm
+        files:
+          aws-xray-daemon-windows-service-3.x.zip:
+            checksums:
+              sha256: !Ref XRayWindowsHash
+          xray.rpm:
+            checksums:
+              sha256: !Ref XRayLinuxHash

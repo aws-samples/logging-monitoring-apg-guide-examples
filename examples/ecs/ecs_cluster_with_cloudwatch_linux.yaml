@@ -1,0 +1,296 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  AWS CloudFormation template to create a new VPC
+  or use an existing VPC for ECS deployment
+  in Create Cluster Wizard. Requires exactly 1
+  Instance Types for a Spot Request.
+Parameters:
+  EcsClusterName:
+    Type: String
+    Description: >
+      Specifies the ECS Cluster Name with which the resources would be
+      associated
+    Default: default
+  ParameterStoreEcsAmiIdKey:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Description: Specifies the parameter store key containing the AMI ID to use for your ECS cluster
+    Default: "/aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id"
+  EcsInstanceType:
+    Type: CommaDelimitedList
+    Description: >
+      Specifies the EC2 instance type for your container instances.
+      Defaults to m4.large
+    Default: m4.large
+    ConstraintDescription: must be a valid EC2 instance type.
+  KeyName:
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: Must be a valid EC2 Key Pair
+    Description: >
+      Optional - Specifies the name of an existing Amazon EC2 key pair
+      to enable SSH access to the EC2 instances in your cluster.
+    Default: ''
+  VpcId:
+    Type: 'AWS::EC2::VPC::Id'
+    Description: Specify a valid, existing VPC
+    ConstraintDescription: You must select an existing VPC
+  SubnetIds:
+    Type: 'List<AWS::EC2::Subnet::Id>'
+    Description: Specify a list of subnets where ECS instances will be provisioned with AutoScaling you should select at least 2 subnets in different AZs for high availability.  Ensure subnets are a member of the VPC you selected.
+  SecurityGroupId:
+    Type: String
+    Description: >
+      Optional - Specifies the Security Group Id of an existing Security
+      Group. Leave blank to have a new Security Group created
+    Default: ''
+  AsgMinSize:
+    Type: Number
+    Description: Specifies the minimum number of instances for the ECS cluster.  You can set this to 2 and higher for a multi-az deployment.
+    Default: '1'
+  AsgMaxSize:
+    Type: Number
+    Description: >
+      Specifies the number of instances to launch and register to the cluster.
+      Defaults to 1.
+    Default: '1'
+  IamRoleInstanceProfile:
+    Type: String
+    Description: >
+      Specifies the Name or the Amazon Resource Name (ARN) of the instance
+      profile associated with the IAM role for the instance
+    Default:  "ecsInstanceRole-cw-ssm"
+  SecurityIngressCidrIp:
+    Type: String
+    Description: >
+      Optional - Specifies the CIDR/IP range for Security Ports - defaults
+      to 0.0.0.0/0
+    Default: 0.0.0.0/0
+  EcsEndpoint:
+    Type: String
+    Description: >
+      Optional - Specifies the ECS Endpoint for the ECS Agent to connect to
+    Default: ''
+  RootEbsVolumeSize:
+    Type: Number
+    Description: >
+      Optional - Specifies the Size in GBs of the root EBS volume
+    Default: 30
+  EbsVolumeSize:
+    Type: Number
+    Description: >
+      Optional - Specifies the Size in GBs of the data storage EBS volume used by the Docker in the AL1 ECS-optimized AMI
+    Default: 22
+  EbsVolumeType:
+    Type: String
+    Description: Optional - Specifies the Type of (Amazon EBS) volume
+    Default: 'gp2'
+    AllowedValues:
+      - ''
+      - standard
+      - io1
+      - gp2
+      - sc1
+      - st1
+    ConstraintDescription: Must be a valid EC2 volume type.
+  UseSpot:
+    Type: String
+    Default: 'false'
+  IamSpotFleetRoleArn:
+    Type: String
+    Default: ''
+  SpotPrice:
+    Type: String
+    Default: ''
+  SpotAllocationStrategy:
+    Type: String
+    Default: 'diversified'
+    AllowedValues:
+      - 'lowestPrice'
+      - 'diversified'
+  AssociatePublicIpAddress:
+    Type: String
+    Description: Associate Public IP address?  The instance must be in a public subnet in order for a public ip address to be assigned.
+    Default: false
+    AllowedValues:
+      - true
+      - false
+  EnableContainerInsightsChoice:
+    Description: Enable CloudWatch Container Insights for this cluster?
+    Type: String
+    AllowedValues:
+      - enabled
+      - disabled
+    Default: enabled
+  EnableManagedScalingChoice:
+    Description: Enable Managed AutoScaling?
+    Type: String
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Default: ENABLED
+  ManagedScalingTargetCapacityValue:
+    Type: Number
+    Description: Optional - The target capacity % utilization value if managed scaling is enabled.
+    Default: 80
+  ManagedTerminationProtectionChoice:
+    Description: Protect instances from scale in for Managed Scaling?  Valid only if managed scaling is enabled.
+    Type: String
+    AllowedValues:
+      - ENABLED
+      - DISABLED
+    Default: DISABLED
+
+Conditions:
+  CreateEC2LCWithKeyPair:
+    !Not [!Equals [!Ref KeyName, '']]
+  SetEndpointToECSAgent:
+    !Not [!Equals [!Ref EcsEndpoint, '']]
+  CreateNewSecurityGroup:
+    !Equals [!Ref SecurityGroupId, '']
+  CreateWithSpot: !Equals [!Ref UseSpot, 'true']
+  CreateWithASG: !Not [!Condition CreateWithSpot]
+  CreateWithSpotPrice: !Not [!Equals [!Ref SpotPrice, '']]
+  EnableManagedScalingChoiceCondition: !Equals [!Ref EnableManagedScalingChoice, 'ENABLED']
+
+
+Resources:
+  EcsSecurityGroup:
+    Condition: CreateNewSecurityGroup
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ECS Allowed Ports
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: !Ref SecurityIngressCidrIp
+
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    DependsOn: ECSCapacityProvider
+    Properties:
+      CapacityProviders:
+        - !Ref ECSCapacityProvider
+      ClusterName: !Ref EcsClusterName
+      ClusterSettings:
+        - Name: containerInsights
+          Value: !Ref EnableContainerInsightsChoice
+#      DefaultCapacityProviderStrategy:
+#        - CapacityProviderStrategyItem
+#      Tags:
+#        - Tag
+
+  ECSCapacityProvider:
+    Type: AWS::ECS::CapacityProvider
+    Properties:
+      AutoScalingGroupProvider:
+        AutoScalingGroupArn: !Ref EcsInstanceAsg
+        ManagedScaling:
+          MaximumScalingStepSize: 10
+          MinimumScalingStepSize: 1
+          Status: !Ref EnableManagedScalingChoice
+          TargetCapacity: !If [EnableManagedScalingChoiceCondition, !Ref ManagedScalingTargetCapacityValue, !Ref AWS::NoValue]
+        ManagedTerminationProtection: !If [EnableManagedScalingChoiceCondition, !Ref ManagedTerminationProtectionChoice, !Ref AWS::NoValue]
+      Name: !Ref EcsClusterName
+#      Tags:
+#        - Tag
+
+  EcsInstanceLc:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Condition: CreateWithASG
+    Properties:
+      ImageId: !Ref ParameterStoreEcsAmiIdKey
+      InstanceType: !Select [ 0, !Ref EcsInstanceType ]
+      AssociatePublicIpAddress: !Ref AssociatePublicIpAddress
+      IamInstanceProfile: !Ref IamRoleInstanceProfile
+      KeyName: !If [ CreateEC2LCWithKeyPair, !Ref KeyName, !Ref "AWS::NoValue" ]
+      SecurityGroups: [ !If [ CreateNewSecurityGroup, !Ref EcsSecurityGroup, !Ref SecurityGroupId ] ]
+      BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: !Ref RootEbsVolumeSize
+          - DeviceName: /dev/xvdcz
+            Ebs:
+              VolumeSize: !Ref EbsVolumeSize
+              VolumeType: !Ref EbsVolumeType
+          - !Ref AWS::NoValue
+      UserData:
+        Fn::Base64: !Sub |
+                    #!/usr/bin/env bash
+                    echo "Installing SSM Agent"
+                    yum install -y https://s3.us-east-1.amazonaws.com/amazon-ssm-us-east-1/latest/linux_amd64/amazon-ssm-agent.rpm
+                    echo "Installing CloudWatch Agent"
+                    yum install amazon-cloudwatch-agent
+                    echo "Configure ECS"
+                    echo ECS_CLUSTER=${EcsClusterName} >> /etc/ecs/ecs.config
+                    echo ECS_BACKEND_HOST= >> /etc/ecs/ecs.config
+
+  EcsInstanceAsg:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Condition: CreateWithASG
+    Properties:
+      VPCZoneIdentifier: !Ref SubnetIds
+      LaunchConfigurationName: !Ref EcsInstanceLc
+      MinSize: !Ref AsgMinSize
+      MaxSize: !Ref AsgMaxSize
+      DesiredCapacity: !Ref AsgMinSize
+      Tags:
+        -
+          Key: Name
+          Value: !Sub "ECS Instance - CloudFormation Stack: ${AWS::StackName}"
+          PropagateAtLaunch: true
+        -
+          Key: Description
+          Value: "This instance is the part of the Auto Scaling group which was created through ECS Console"
+          PropagateAtLaunch: true
+  EcsSpotFleet:
+    Condition: CreateWithSpot
+    Type: AWS::EC2::SpotFleet
+    Properties:
+      SpotFleetRequestConfigData:
+        AllocationStrategy: !Ref SpotAllocationStrategy
+        IamFleetRole: !Ref IamSpotFleetRoleArn
+        TargetCapacity: !Ref AsgMaxSize
+        SpotPrice: !If [ CreateWithSpotPrice, !Ref SpotPrice, !Ref 'AWS::NoValue' ]
+        TerminateInstancesWithExpiration: true
+        LaunchSpecifications:
+          -
+            IamInstanceProfile:
+              Arn: !Ref IamRoleInstanceProfile
+            ImageId: !Ref ParameterStoreEcsAmiIdKey
+            InstanceType: !Select [ 0, !Ref EcsInstanceType ]
+            KeyName: !If [ CreateEC2LCWithKeyPair, !Ref KeyName, !Ref "AWS::NoValue" ]
+            Monitoring:
+              Enabled: true
+            SecurityGroups:
+              - GroupId: !If [ CreateNewSecurityGroup, !Ref EcsSecurityGroup, !Ref SecurityGroupId ]
+            SubnetId: !Ref SubnetIds
+            BlockDeviceMappings:
+              - DeviceName: /dev/xvda
+                Ebs:
+                  VolumeSize: !Ref EbsVolumeSize
+                  VolumeType: !Ref EbsVolumeType
+            UserData:
+              Fn::Base64: !Sub |
+                #!/usr/bin/env bash
+                echo "Installing SSM Agent"
+                sudo yum install amazon-cloudwatch-agent
+                echo ECS_CLUSTER=${EcsClusterName} >> /etc/ecs/ecs.config
+                echo ECS_BACKEND_HOST= >> /etc/ecs/ecs.config
+
+
+Outputs:
+  EcsInstanceAsgName:
+    Condition: CreateWithASG
+    Description: Auto Scaling Group Name for ECS Instances
+    Value: !Ref EcsInstanceAsg
+  EcsSpotFleetRequestId:
+    Condition: CreateWithSpot
+    Description: Spot Fleet Request for ECS Instances
+    Value: !Ref EcsSpotFleet
+  UsedByECSCreateCluster:
+    Description: Flag used by ECS Create Cluster Wizard
+    Value: 'true'
+  TemplateVersion:
+    Description: The version of the template used by Create Cluster Wizard
+    Value: '2.0.0'

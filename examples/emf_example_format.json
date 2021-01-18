@@ -1,0 +1,1 @@
+{"_aws": {"Timestamp": 1603142162000, "CloudWatchMetrics": [{"Namespace": "CustomMetrics", "Dimensions": [["functionVersion"]], "Metrics": [{"Name": "lambdatime2", "Unit": "Milliseconds"}]}]}, "functionVersion": "1.0", "lambdatime2": 200}

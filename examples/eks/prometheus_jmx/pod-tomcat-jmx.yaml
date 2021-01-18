@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tomcat-jmx
+  labels:
+    env: test
+  namespace: amazon-cloudwatch
+spec:
+  containers:
+    - name: tomcat-jmx
+      image: <ECR repo with tomcat>
+      imagePullPolicy: IfNotPresent
+      ports:
+        - containerPort: 9404
+        - containerPort: 8080
+

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "2.0",
+  "version": "3.x",
+  "publisher": "Amazon Web Services",
+  "packages": {
+    "windows": {
+      "_any": {
+        "x86_64": {
+          "file": "aws-xray-daemon-windows-service-3.x.zip"
+        }
+      }
+    },
+    "amazon": {
+      "_any": {
+        "x86_64": {
+          "file": "xray.rpm"
+        }
+      }
+    },
+    "ubuntu": {
+      "_any": {
+        "x86_64": {
+          "file": "xray.rpm"
+        }
+      }
+    }
+  },
+  "files": {
+    "aws-xray-daemon-windows-service-3.x.zip": {
+      "checksums": {
+        "sha256": "EXAMPLEc2c706013cf8c68163459678f7f6daa9489cd3f91d52799331EXAMPLE"
+      }
+    },
+    "xray.rpm": {
+      "checksums": {
+        "sha256": "EXAMPLE2b8b9ed71e86f39f5946e837df0d38aacdd38955b4b18ffa6fEXAMPLE"
+      }
+    }
+  }
+}

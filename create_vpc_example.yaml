@@ -1,0 +1,143 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description:  This template deploys a VPC, with a single public subnet.  It deploys an internet gateway, with a default route on the public subnet.
+Parameters:
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.0.0.0/24
+
+  PublicSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 10.0.0.0/24
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: "CloudWatchEC2AutoAlarmDemo"
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: "CloudWatchEC2AutoAlarmDemo"
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: CloudWatchEC2AutoAlarmDemo Public Subnet (AZ1)
+
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: CloudWatchEC2AutoAlarmDemo Public Routes
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+
+#  Vpc:
+#    Condition: CreateSubnet1
+#    Type: AWS::EC2::VPC
+#    Properties:
+#      CidrBlock: !Ref VpcCidr
+#      EnableDnsSupport: true
+#      EnableDnsHostnames: true
+#  PubSubnetAz1:
+#    Condition: CreateSubnet1
+#    Type: AWS::EC2::Subnet
+#    Properties:
+#      VpcId: !Ref Vpc
+#      CidrBlock: !Ref SubnetCidr1
+#      AvailabilityZone: !Select [ 0, !Ref VpcAvailabilityZones ]
+#      MapPublicIpOnLaunch: true
+#  PubSubnetAz2:
+#    Condition: CreateSubnet2
+#    Type: AWS::EC2::Subnet
+#    Properties:
+#      VpcId: !Ref Vpc
+#      CidrBlock: !Ref SubnetCidr2
+#      AvailabilityZone: !Select [ 1, !Ref VpcAvailabilityZones ]
+#      MapPublicIpOnLaunch: true
+#  PubSubnetAz3:
+#    Condition: CreateSubnet3
+#    Type: AWS::EC2::Subnet
+#    Properties:
+#      VpcId: !Ref Vpc
+#      CidrBlock: !Ref SubnetCidr3
+#      AvailabilityZone: !Select [ 2, !Ref VpcAvailabilityZones ]
+#      MapPublicIpOnLaunch: true
+#  InternetGateway:
+#    Condition: CreateSubnet1
+#    Type: AWS::EC2::InternetGateway
+#  AttachGateway:
+#    Condition: CreateSubnet1
+#    Type: AWS::EC2::VPCGatewayAttachment
+#    Properties:
+#      VpcId: !Ref Vpc
+#      InternetGatewayId: !Ref InternetGateway
+#  RouteViaIgw:
+#    Condition: CreateSubnet1
+#    Type: AWS::EC2::RouteTable
+#    Properties:
+#      VpcId: !Ref Vpc
+#  PublicRouteViaIgw:
+#    Condition: CreateSubnet1
+#    Type: AWS::EC2::Route
+#    DependsOn: AttachGateway
+#    Properties:
+#      RouteTableId: !Ref RouteViaIgw
+#      DestinationCidrBlock: 0.0.0.0/0
+#      GatewayId: !Ref InternetGateway
+#  PubSubnet1RouteTableAssociation:
+#    Condition: CreateSubnet1
+#    Type: AWS::EC2::SubnetRouteTableAssociation
+#    Properties:
+#      SubnetId: !Ref PubSubnetAz1
+#      RouteTableId: !Ref RouteViaIgw
+#  PubSubnet2RouteTableAssociation:
+#    Condition: CreateSubnet2
+#    Type: AWS::EC2::SubnetRouteTableAssociation
+#    Properties:
+#      SubnetId: !Ref PubSubnetAz2
+#      RouteTableId: !Ref RouteViaIgw
+#  PubSubnet3RouteTableAssociation:
+#    Condition: CreateSubnet3
+#    Type: AWS::EC2::SubnetRouteTableAssociation
+#    Properties:
+#      SubnetId: !Ref PubSubnetAz3
+#      RouteTableId: !Ref RouteViaIgw
