@@ -220,7 +220,7 @@ Resources:
                     echo "Installing SSM Agent"
                     yum install -y https://s3.us-east-1.amazonaws.com/amazon-ssm-us-east-1/latest/linux_amd64/amazon-ssm-agent.rpm
                     echo "Installing CloudWatch Agent"
-                    yum install amazon-cloudwatch-agent
+                    yum install -y amazon-cloudwatch-agent
                     echo "Configure ECS"
                     echo ECS_CLUSTER=${EcsClusterName} >> /etc/ecs/ecs.config
                     echo ECS_BACKEND_HOST= >> /etc/ecs/ecs.config
