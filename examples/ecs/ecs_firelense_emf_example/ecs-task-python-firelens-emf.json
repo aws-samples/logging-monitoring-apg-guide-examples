@@ -3,7 +3,7 @@
   "taskRoleArn": "<enter your ecs task execution role here>",
   "cpu": "512",
   "memory": "512",
-  "family": "pythondemo-firelense-example",
+  "family": "pythondemo-firelense-emf-example",
   "containerDefinitions": [
     {
       "image": "<enter the ecr / docker repository where the container image for the demo has been deployed>",

@@ -1,4 +1,4 @@
-# FireLens with the Embedded Metric Format Example
+# Using the FireLens fluent bit agent to send CloudWatch logs in Embedded Metric Format - Demo
 
 You can deploy a sample python application that demonstrates how you can use Firelens with the Embedded Metric Format.  This will enable you to capture custom CloudWatch metrics for your container based workloads running on ECS.  This example uses the [aws-embedded-metrics library for python](https://github.com/awslabs/aws-embedded-metrics-python).
 
