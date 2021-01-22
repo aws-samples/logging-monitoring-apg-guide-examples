@@ -28,7 +28,7 @@ You can use the AWS CLI to create a task definition for an ECS cluster with EC2 
 
         aws ecs register-task-definition --cli-input-json file://ecs-task-python-firelens-emf.json --region <your aws region>
 
-### Launch a new ECS task using the created ECS task definition.
+### Launch a new ECS task using the created ECS task definition
 
 Launch a new task into an existing ECS cluster using the task definition you created.  The task definition that is provided is compatible with ECS clusters with EC2 container instances.  You can modify it to work with FARGATE by specifying an **awsvpc** for the **networkMode**.
 

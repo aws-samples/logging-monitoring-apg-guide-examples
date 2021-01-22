@@ -1,15 +1,18 @@
 {
-  "executionRoleArn": "<update with your execution role>",
+  "executionRoleArn": "<enter your execution role>",
+  "taskRoleArn": "<enter your task role>",
   "memory": "512",
-  "taskRoleArn": "<update with your task role>",
   "family": "pythondemo-cw-emf-example",
+  "requiresCompatibilities": [
+    "EC2"
+  ],
   "cpu": "512",
   "containerDefinitions": [
     {
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/pythondemo",
+          "awslogs-group": "/ecs/pythondemo-cw-emf-example",
           "awslogs-region": "us-east-1",
           "awslogs-stream-prefix": "ecs"
         }
@@ -21,11 +24,11 @@
         },
         {
           "name": "AWS_EMF_LOG_GROUP_NAME",
-          "value": "pythondemo"
+          "value": "pythondemo-cw-emf-example"
         },
         {
           "name": "AWS_EMF_LOG_STREAM_NAME",
-          "value": "pythondemo"
+          "value": "pythondemo-cw-emf-example"
         },
         {
           "name": "AWS_EMF_NAMESPACE",
@@ -33,7 +36,7 @@
         },
         {
           "name": "AWS_EMF_SERVICE_NAME",
-          "value": "pythondemo"
+          "value": "pythondemo-cw-emf-example"
         },
         {
           "name": "AWS_EMF_SERVICE_TYPE",
@@ -41,23 +44,24 @@
         }
       ],
       "memory": 256,
-      "image": "<update with your image repo>",
+      "image": "<enter your image>",
       "dependsOn": [
         {
           "containerName": "cwagent",
           "condition": "START"
         }
       ],
+      "essential": false,
       "links": [
         "cwagent"
       ],
-      "name": "pythondemocontainer"
+      "name": "pythondemo-cw-emf-example-container"
     },
     {
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/pythondemo",
+          "awslogs-group": "/ecs/pythondemo-cw-emf-example",
           "awslogs-region": "us-east-1",
           "awslogs-stream-prefix": "ecs"
         }
@@ -76,8 +80,8 @@
           "name": "CW_CONFIG_CONTENT"
         }
       ],
+      "memory": 256,
       "image": "amazon/cloudwatch-agent:latest",
-      "essential": true,
       "name": "cwagent"
     }
   ]
