@@ -216,14 +216,43 @@ Resources:
           - !Ref AWS::NoValue
       UserData:
         Fn::Base64: !Sub |
-                    #!/usr/bin/env bash
-                    echo "Installing SSM Agent"
-                    yum install -y https://s3.us-east-1.amazonaws.com/amazon-ssm-us-east-1/latest/linux_amd64/amazon-ssm-agent.rpm
-                    echo "Installing CloudWatch Agent"
-                    yum install -y amazon-cloudwatch-agent
-                    echo "Configure ECS"
-                    echo ECS_CLUSTER=${EcsClusterName} >> /etc/ecs/ecs.config
-                    echo ECS_BACKEND_HOST= >> /etc/ecs/ecs.config
+          #!/usr/bin/env bash
+          echo "Installing CloudWatch Agent"
+          yum install -y amazon-cloudwatch-agent
+          echo "Configuring CloudWatch Agent"
+          cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/ecs_default.json <<"EOL"
+          {
+            "logs": {
+              "logs_collected": {
+                "files": {
+                  "collect_list": [
+                    {
+                      "file_path": "/var/log/ecs/ecs-init.log",
+                      "log_group_name": "/var/log/ecs/ecs-init",
+                      "log_stream_name": "{instance_id}"
+                    },
+                    {
+                      "file_path": "/var/log/ecs/ecs-agent.log",
+                      "log_group_name": "/var/log/ecs/ecs-agent",
+                      "log_stream_name": "{instance_id}"
+                    },
+                    {
+                      "file_path": "/var/log/ecs/audit.log",
+                      "log_group_name": "/var/log/ecs/audit",
+                      "log_stream_name": "{instance_id}"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+          EOL
+          /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a start -m ec2
+          echo "Installing SSM Agent"
+          yum install -y https://s3.us-east-1.amazonaws.com/amazon-ssm-us-east-1/latest/linux_amd64/amazon-ssm-agent.rpm
+          echo "Configuring ECS"
+          echo ECS_CLUSTER=${EcsClusterName} >> /etc/ecs/ecs.config
+          echo ECS_BACKEND_HOST= >> /etc/ecs/ecs.config
 
   EcsInstanceAsg:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -273,11 +302,42 @@ Resources:
             UserData:
               Fn::Base64: !Sub |
                 #!/usr/bin/env bash
+                echo "Installing CloudWatch Agent"
+                yum install -y amazon-cloudwatch-agent
+                echo "Configuring CloudWatch Agent"
+                cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/ecs_default.json <<"EOL"
+                {
+                  "logs": {
+                    "logs_collected": {
+                      "files": {
+                        "collect_list": [
+                          {
+                            "file_path": "/var/log/ecs/ecs-init.log",
+                            "log_group_name": "/var/log/ecs/ecs-init",
+                            "log_stream_name": "{instance_id}"
+                          },
+                          {
+                            "file_path": "/var/log/ecs/ecs-agent.log",
+                            "log_group_name": "/var/log/ecs/ecs-agent",
+                            "log_stream_name": "{instance_id}"
+                          },
+                          {
+                            "file_path": "/var/log/ecs/audit.log",
+                            "log_group_name": "/var/log/ecs/audit",
+                            "log_stream_name": "{instance_id}"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+                EOL
+                /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a start -m ec2
                 echo "Installing SSM Agent"
-                sudo yum install amazon-cloudwatch-agent
+                yum install -y https://s3.us-east-1.amazonaws.com/amazon-ssm-us-east-1/latest/linux_amd64/amazon-ssm-agent.rpm
+                echo "Configuring ECS"
                 echo ECS_CLUSTER=${EcsClusterName} >> /etc/ecs/ecs.config
                 echo ECS_BACKEND_HOST= >> /etc/ecs/ecs.config
-
 
 Outputs:
   EcsInstanceAsgName:
