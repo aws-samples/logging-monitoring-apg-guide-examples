@@ -26,11 +26,6 @@ Resources:
       #        DestinationBucketName:
       #          Fn::ImportValue: !Sub <Destination Log Bucket>
       #        LogFilePrefix: <Logfile Prefix>
-      LifecycleConfiguration:
-        Rules:
-          - Id: DeleteRule
-            Status: Enabled
-            ExpirationInDays: '90'
 
   DeploymentBucketPolicy:
     Type: "AWS::S3::BucketPolicy"
