@@ -1,7 +1,12 @@
 ---
+Description: Customized SSM Quick Setup to support centralized Cloudwatch configuration distribution and update
 Metadata:
   Version: '1.1'
 Parameters:
+  CloudWatchConfigBucketARN:
+    Type: String
+    Default: ''
+    Description: "(Required) S3 Bucket Name containing standard CloudWatch configurations"
   QSType:
     Type: String
     AllowedValues:
@@ -13,7 +18,7 @@ Parameters:
       organizational."
   QSConfigurationId:
     Type: String
-    Default: ''
+    Default: 'LoggingMonitoringQS'
     Description: "(Required) Unique identifier of the deployed configuration."
   QSGlobalResourcesRegion:
     Type: String
@@ -27,7 +32,7 @@ Parameters:
       account is operating."
   UpdateSsmAgent:
     Type: String
-    Default: 'true'
+    Default: 'false'
     AllowedValues:
     - 'true'
     - 'false'
@@ -35,7 +40,7 @@ Parameters:
       (every 2 weeks)."
   CollectInventory:
     Type: String
-    Default: 'true'
+    Default: 'false'
     AllowedValues:
     - 'true'
     - 'false'
@@ -43,7 +48,7 @@ Parameters:
       30 minutes)."
   ScanInstances:
     Type: String
-    Default: 'true'
+    Default: 'false'
     AllowedValues:
     - 'true'
     - 'false'
@@ -51,14 +56,14 @@ Parameters:
       patches (every day)."
   InstallCloudWatchAgent:
     Type: String
-    Default: 'false'
+    Default: 'true'
     AllowedValues:
     - 'true'
     - 'false'
     Description: "(Optional) Whether the CloudWatch agent should be installed."
   UpdateCloudWatchAgent:
     Type: String
-    Default: 'false'
+    Default: 'true'
     AllowedValues:
     - 'true'
     - 'false'
@@ -217,6 +222,23 @@ Conditions:
     - Ref: TargetInstances
     - "*"
 Resources:
+  CloudWatchConfigS3BucketPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: This policy grants access to the S3 bucket used for storing standard CloudWatch configuration files
+      ManagedPolicyName: !Sub "CloudWatchConfigS3BucketPolicy-${AWS::Region}"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:GetObjectVersion
+              - s3:ListBucket
+            Resource:
+              - !Ref CloudWatchConfigBucketARN
+              - !Sub "${CloudWatchConfigBucketARN}/*"
+
   RoleForAutomation:
     Type: AWS::IAM::Role
     Properties:
@@ -249,42 +271,42 @@ Resources:
               - ''
               - - 'arn:'
                 - Ref: AWS::Partition
-                - ":ssm:*:*:servicesetting/ssm/opsitem/ssm-patchmanager"
+                - !Sub ":ssm:${AWS::Region}:${AWS::AccountId}:servicesetting/ssm/opsitem/ssm-patchmanager"
             - Fn::Join:
               - ''
               - - 'arn:'
                 - Ref: AWS::Partition
-                - ":ssm:*:*:servicesetting/ssm/opsitem/EC2"
+                - !Sub ":ssm:${AWS::Region}:${AWS::AccountId}:servicesetting/ssm/opsitem/EC2"
             - Fn::Join:
               - ''
               - - 'arn:'
                 - Ref: AWS::Partition
-                - ":ssm:*:*:servicesetting/ssm/opsdata/ExplorerOnboarded"
+                - !Sub ":ssm:${AWS::Region}:${AWS::AccountId}:servicesetting/ssm/opsdata/ExplorerOnboarded"
             - Fn::Join:
               - ''
               - - 'arn:'
                 - Ref: AWS::Partition
-                - ":ssm:*:*:servicesetting/ssm/opsdata/Association"
+                - !Sub ":ssm:${AWS::Region}:${AWS::AccountId}:servicesetting/ssm/opsdata/Association"
             - Fn::Join:
               - ''
               - - 'arn:'
                 - Ref: AWS::Partition
-                - ":ssm:*:*:servicesetting/ssm/opsdata/ComputeOptimizer"
+                - !Sub ":ssm:${AWS::Region}:${AWS::AccountId}:servicesetting/ssm/opsdata/ComputeOptimizer"
             - Fn::Join:
               - ''
               - - 'arn:'
                 - Ref: AWS::Partition
-                - ":ssm:*:*:servicesetting/ssm/opsdata/ConfigCompliance"
+                - !Sub ":ssm:${AWS::Region}:${AWS::AccountId}:servicesetting/ssm/opsdata/ConfigCompliance"
             - Fn::Join:
               - ''
               - - 'arn:'
                 - Ref: AWS::Partition
-                - ":ssm:*:*:servicesetting/ssm/opsdata/OpsData-TrustedAdvisor"
+                - !Sub ":ssm:${AWS::Region}:${AWS::AccountId}:servicesetting/ssm/opsdata/OpsData-TrustedAdvisor"
             - Fn::Join:
               - ''
               - - 'arn:'
                 - Ref: AWS::Partition
-                - ":ssm:*:*:servicesetting/ssm/opsdata/SupportCenterCase"
+                - !Sub ":ssm:${AWS::Region}:${AWS::AccountId}:servicesetting/ssm/opsdata/SupportCenterCase"
           - Effect: Allow
             Action:
             - iam:CreateServiceLinkedRole
@@ -293,7 +315,7 @@ Resources:
               - ''
               - - 'arn:'
                 - Ref: AWS::Partition
-                - ":iam::*:role/aws-service-role/ssm."
+                - !Sub ":iam::${AWS::AccountId}:role/aws-service-role/ssm."
                 - Ref: AWS::URLSuffix
                 - "/AWSServiceRoleForAmazonSSM"
             Condition:
@@ -307,15 +329,44 @@ Resources:
             Action:
             - ssm:GetAutomationExecution
             - ec2:DescribeIamInstanceProfileAssociations
-            - ec2:AssociateIamInstanceProfile
             - ec2:DisassociateIamInstanceProfile
             - ec2:DescribeInstances
             - ssm:StartAutomationExecution
             - iam:GetInstanceProfile
-            - iam:AddRoleToInstanceProfile
-            - iam:AttachRolePolicy
             - iam:ListInstanceProfilesForRole
             Resource: "*"
+          - Effect: Allow
+            Action:
+              - iam:AttachRolePolicy
+            Resource: "*"
+            Condition:
+              ArnEquals:
+                iam:PolicyARN:
+                  - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+                  - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+                  - arn:aws:iam::aws:policy/AmazonSSMPatchAssociation
+                  - !Ref CloudWatchConfigS3BucketPolicy
+          - Effect: Allow
+            Action:
+              - iam:AddRoleToInstanceProfile
+            Resource:
+              - Fn::Join:
+                  - ''
+                  - - 'arn:'
+                    - Ref: AWS::Partition
+                    - !Sub ":iam::${AWS::AccountId}:instance-profile/AmazonSSMRoleForInstancesQuickSetup"
+          - Effect: Allow
+            Action:
+              - ec2:AssociateIamInstanceProfile
+            Resource: "*"
+            Condition:
+              StringEquals:
+                ec2:NewInstanceProfile:
+                  - Fn::Join:
+                      - ''
+                      - - 'arn:'
+                        - Ref: AWS::Partition
+                        - !Sub ":iam::${AWS::AccountId}:instance-profile/AmazonSSMRoleForInstancesQuickSetup"
           - Effect: Allow
             Action:
             - iam:CreateInstanceProfile
@@ -324,7 +375,7 @@ Resources:
               - ''
               - - 'arn:'
                 - Ref: AWS::Partition
-                - ":iam::*:instance-profile/AmazonSSMRoleForInstancesQuickSetup"
+                - !Sub ":iam::${AWS::AccountId}:instance-profile/AmazonSSMRoleForInstancesQuickSetup"
           - Effect: Allow
             Action:
             - iam:PassRole
@@ -334,12 +385,12 @@ Resources:
               - ''
               - - 'arn:'
                 - Ref: AWS::Partition
-                - ":iam::*:role/AmazonSSMRoleForInstancesQuickSetup"
+                - !Sub ":iam::${AWS::AccountId}:role/AmazonSSMRoleForInstancesQuickSetup"
             - Fn::Join:
               - ''
               - - 'arn:'
                 - Ref: AWS::Partition
-                - ":iam::*:role/AWS-QuickSetup-HostMgmtRole-"
+                - !Sub ":iam::${AWS::AccountId}:role/AWS-QuickSetup-HostMgmtRole-"
                 - Ref: AWS::Region
                 - "-"
                 - Ref: QSConfigurationId
@@ -351,7 +402,16 @@ Resources:
               - ''
               - - 'arn:'
                 - Ref: AWS::Partition
-                - ":iam::*:role/AmazonSSMRoleForInstancesQuickSetup"
+                - !Sub ":iam::${AWS::AccountId}:role/AmazonSSMRoleForInstancesQuickSetup"
+          - Effect: Allow
+            Action:
+              - iam:PutRolePolicy
+            Resource:
+              - Fn::Join:
+                  - ''
+                  - - 'arn:'
+                    - Ref: AWS::Partition
+                    - !Sub ":iam::${AWS::AccountId}:role/AmazonSSMRoleForInstancesQuickSetup"
         PolicyName:
           Fn::Join:
           - ''
@@ -369,6 +429,7 @@ Resources:
   CreateAndAttachIAMToInstance:
     Type: AWS::SSM::Document
     Properties:
+      DocumentFormat: YAML
       Content:
         description: Composite document for Quick Setup Managing Instances association.
           This document ensures IAM role for instance profile is created in account
@@ -438,6 +499,22 @@ Resources:
             Api: AttachRolePolicy
             RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
             PolicyArn: arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+          nextStep: attachCloudWatchAgentServerPolicyToExistingRole
+        - inputs:
+            RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
+            PolicyArn: arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+            Service: iam
+            Api: AttachRolePolicy
+          name: attachCloudWatchAgentServerPolicyToExistingRole
+          action: aws:executeAwsApi
+          nextStep: attachCloudWatchConfigS3BucketPolicyToExistingRole
+        - inputs:
+            RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
+            PolicyArn: !Ref CloudWatchConfigS3BucketPolicy
+            Service: iam
+            Api: AttachRolePolicy
+          name: attachCloudWatchConfigS3BucketPolicyToExistingRole
+          action: aws:executeAwsApi
           nextStep: attachAmazonSSMPatchAssociationToExistingRole
         - name: attachAmazonSSMPatchAssociationToExistingRole
           action: aws:executeAwsApi
@@ -477,6 +554,22 @@ Resources:
             Api: AttachRolePolicy
             RoleName: AmazonSSMRoleForInstancesQuickSetup
             PolicyArn: arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+          nextStep: attachCloudWatchAgentServerPolicyToRole
+        - inputs:
+            RoleName: AmazonSSMRoleForInstancesQuickSetup
+            PolicyArn: arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+            Service: iam
+            Api: AttachRolePolicy
+          name: attachCloudWatchAgentServerPolicyToRole
+          action: aws:executeAwsApi
+          nextStep: attachCloudWatchConfigS3BucketPolicyToRole
+        - inputs:
+            RoleName: AmazonSSMRoleForInstancesQuickSetup
+            PolicyArn: !Ref CloudWatchConfigS3BucketPolicy
+            Service: iam
+            Api: AttachRolePolicy
+          name: attachCloudWatchConfigS3BucketPolicyToRole
+          action: aws:executeAwsApi
           nextStep: attachAmazonSSMPatchAssociationToRole
         - name: attachAmazonSSMPatchAssociationToRole
           action: aws:executeAwsApi
@@ -516,14 +609,15 @@ Resources:
               InstanceId: "{{ InstanceId }}"
           isEnd: true
       DocumentType: Automation
-      Name:
-        Fn::Join:
-        - ''
-        - - AWSQuickSetup-CreateAndAttachIAMToInstance-
-          - Ref: QSConfigurationId
+#      Name:
+#        Fn::Join:
+#        - ''
+#        - - AWSQuickSetup-CreateAndAttachIAMToInstance-
+#          - Ref: QSConfigurationId
   UpdateExistingInstanceProfile:
     Type: AWS::SSM::Document
     Properties:
+      DocumentFormat: YAML
       Content:
         description: Composite document for Quick Setup Managing Instances association.
           This document updates the user provided instance profile with roles and
@@ -556,6 +650,22 @@ Resources:
             Api: AttachRolePolicy
             RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
             PolicyArn: arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+          nextStep: !Sub "attachCloudWatchConfigS3BucketPolicyToExistingRole"
+        - inputs:
+            RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
+            PolicyArn: !Ref CloudWatchConfigS3BucketPolicy
+            Service: iam
+            Api: AttachRolePolicy
+          name: !Sub "attachCloudWatchConfigS3BucketPolicyToExistingRole"
+          action: aws:executeAwsApi
+          nextStep: attachCloudWatchAgentServerPolicyToExistingRole
+        - name: attachCloudWatchAgentServerPolicyToExistingRole
+          action: aws:executeAwsApi
+          inputs:
+            Service: iam
+            Api: AttachRolePolicy
+            RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
+            PolicyArn: arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
           nextStep: attachAmazonSSMPatchAssociationToExistingRole
         - name: attachAmazonSSMPatchAssociationToExistingRole
           action: aws:executeAwsApi
@@ -867,91 +977,33 @@ Resources:
   InstallAndManageCloudWatchDocument:
     Type: AWS::SSM::Document
     Properties:
+      DocumentFormat: YAML
       Content:
-        schemaVersion: '2.2'
-        description: The AWS-InstallAndManageCloudWatch command document installs
-          the Amazon CloudWatch agent and manages the configuration of the agent for
-          Amazon EC2 instances.
-        mainSteps:
-        - action: aws:runDocument
-          name: installCWAgent
-          inputs:
-            documentType: SSMDocument
-            documentPath: AWS-ConfigureAWSPackage
-            documentParameters:
-              action: Install
-              name: AmazonCloudWatchAgent
-        - action: aws:runDocument
-          name: manageCWAgent
-          inputs:
-            documentType: SSMDocument
-            documentPath: AmazonCloudWatch-ManageAgent
-            documentParameters:
-              action: configure
-              mode: ec2
-              optionalConfigurationSource: default
-              optionalRestart: 'yes'
-      DocumentType: Command
-      Name:
-        Fn::Join:
-        - ''
-        - - AWSQuickSetup-InstallAndManageCloudWatchDocument-
-          - Ref: QSConfigurationId
-    Condition: CreateInstallAndManageCloudWatchAgentAssociation
-  SystemAssociationForInstallAndConfigureCloudWatchAgent:
-    Type: AWS::SSM::Association
-    Properties:
-      Name:
-        Ref: InstallAndManageCloudWatchDocument
-      AssociationName:
-        Fn::Join:
-        - ''
-        - - AWS-QuickSetup-SSMHostMgmt-ManageCloudWatchAgent-
-          - Ref: QSConfigurationId
-      ScheduleExpression:
-        Ref: AWS::NoValue
-      Targets:
-        Fn::If:
-        - IsOrgQuickSetup
-        - - Key: InstanceIds
-            Values:
-            - "*"
-        - Fn::If:
-          - IsTagKeyAndValueTargeted
-          - - Key:
+        schemaVersion: "2.2"
+        description: "A composite document for installing and configuring the CloudWatch Agent."
+        parameters:
+          sourceInfoWindows:
+            description: "Amazon S3 bucket used to store CloudWatch configuration files"
+            type: StringMap
+            displayType: "textarea"
+            default:
+              path:
                 Fn::Join:
                 - ''
-                - - 'tag:'
-                  - Ref: TargetTagKey
-              Values:
-              - Ref: TargetTagValue
-          - Fn::If:
-            - IsTagKeyOnlyTargeted
-            - - Key: tag-key
-                Values:
-                - Ref: TargetTagKey
-            - Fn::If:
-              - IsResourceGroupTargeted
-              - - Key: resource-groups:Name
-                  Values:
-                  - Ref: ResourceGroupName
-              - Fn::If:
-                - TargetAll
-                - - Key: InstanceIds
-                    Values:
-                    - "*"
-                - - Key: InstanceIds
-                    Values:
-                      Fn::Split:
-                      - ","
-                      - Ref: TargetInstances
-    Condition: CreateInstallAndManageCloudWatchAgentAssociation
-  UpdateCloudWatchDocument:
-    Type: AWS::SSM::Document
-    Properties:
-      Content:
-        schemaVersion: '2.2'
-        description: A composite document for updating CloudWatch agent.
+                - - 'https://s3.amazonaws.com/'
+                  - !Select [5, !Split [":", !Ref CloudWatchConfigBucketARN]]
+                  - '/config/standard/windows'
+          sourceInfoLinux:
+            description: "Amazon S3 bucket used to store CloudWatch configuration files"
+            type: StringMap
+            displayType: "textarea"
+            default:
+              path:
+                Fn::Join:
+                  - ''
+                  - - 'https://s3.amazonaws.com/'
+                    - !Select [5, !Split [":", !Ref CloudWatchConfigBucketARN]]
+                    - '/config/standard/linux'
         mainSteps:
         - precondition:
             StringEquals:
@@ -961,7 +1013,7 @@ Resources:
           name: first
           inputs:
             runCommand:
-            - sleep 1800
+            - sleep 300
         - precondition:
             StringEquals:
             - platformType
@@ -970,31 +1022,142 @@ Resources:
           name: second
           inputs:
             runCommand:
-            - Start-Sleep -Seconds 1800
+            - Start-Sleep -Seconds 300
         - action: aws:runDocument
           name: installCWAgent
           inputs:
             documentType: SSMDocument
             documentPath: AWS-ConfigureAWSPackage
-            documentParameters: '{"action":"Install","name" : "AmazonCloudWatchAgent"}'
+            documentParameters:
+              action: Install
+              name: AmazonCloudWatchAgent
+        - action: aws:downloadContent
+          precondition:
+            StringEquals:
+              - platformType
+              - Windows
+          name: DownloadStandardCloudWatchConfigWindows
+          inputs:
+            sourceType: S3
+            sourceInfo: "{{ sourceInfoWindows }}"
+            destinationPath: "C:\\ProgramData\\Amazon\\AmazonCloudWatchAgent\\Configs"
+        - action: aws:runPowerShellScript
+          precondition:
+            StringEquals:
+              - platformType
+              - Windows
+          name: DeleteEtagFilesWindows
+          inputs:
+            timeoutSeconds: '60'
+            runCommand:
+              - del /f C:\\ProgramData\\Amazon\\AmazonCloudWatchAgent\\Configs\\*.etag
+        - action: "aws:runDocument"
+          precondition:
+            StringEquals:
+              - platformType
+              - Windows
+          name: "StopCloudWatchWindows"
+          inputs:
+            documentType: "SSMDocument"
+            documentPath: "AmazonCloudWatch-ManageAgent"
+            documentParameters:
+              action: "stop"
+              mode: "ec2"
+        - action: "aws:runDocument"
+          precondition:
+            StringEquals:
+              - platformType
+              - Windows
+          name: "StartCloudWatchWindows"
+          inputs:
+            documentType: "SSMDocument"
+            documentPath: "AmazonCloudWatch-ManageAgent"
+            documentParameters:
+              action: "start"
+              mode: "ec2"
+        - action: aws:downloadContent
+          precondition:
+            StringEquals:
+              - platformType
+              - Linux
+          name: downloadStandardCloudWatchConfigLinux
+          inputs:
+            sourceType: S3
+            sourceInfo: "{{ sourceInfoLinux }}"
+            destinationPath: "/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d"
+        - action: aws:runShellScript
+          precondition:
+            StringEquals:
+              - platformType
+              - Linux
+          name: DeleteEtagFilesLinux
+          inputs:
+            timeoutSeconds: '60'
+            runCommand:
+              - rm -f /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/*.etag
+        - action: "aws:runDocument"
+          precondition:
+            StringEquals:
+              - platformType
+              - Linux
+          name: "StopCloudWatchLinux"
+          inputs:
+            documentType: "SSMDocument"
+            documentPath: "AmazonCloudWatch-ManageAgent"
+            documentParameters:
+              action: "stop"
+              mode: "ec2"
+        - action: "aws:runDocument"
+          precondition:
+            StringEquals:
+              - platformType
+              - Linux
+          name: "StartCloudWatchLinux"
+          inputs:
+            documentType: "SSMDocument"
+            documentPath: "AmazonCloudWatch-ManageAgent"
+            documentParameters:
+              action: "start"
+              mode: "ec2"
       DocumentType: Command
-      Name:
-        Fn::Join:
-        - ''
-        - - UpdateCloudWatchDocument-
-          - Ref: QSConfigurationId
-    Condition: UpdateCloudWatchAgentAssociation
-  SystemAssociationForUpdateCloudWatchAgent:
+#      Name:
+#        Fn::Join:
+#        - ''
+#        - - AWSQuickSetup-InstallAndManageCloudWatchDocument-
+#          - Ref: QSConfigurationId
+    Condition: CreateInstallAndManageCloudWatchAgentAssociation
+  SystemAssociationForInstallAndConfigureCloudWatchAgent:
     Type: AWS::SSM::Association
     Properties:
       Name:
-        Ref: UpdateCloudWatchDocument
+        Ref: InstallAndManageCloudWatchDocument
+      Parameters:
+        sourceInfoWindows:
+          - Fn::Join:
+              - ''
+              - - '{"path":'
+                - '"https://s3.amazonaws.com/'
+                - !Select [ 5, !Split [ ":", !Ref CloudWatchConfigBucketARN ] ]
+                - '/config/standard/windows"'
+                - '}'
+        sourceInfoLinux:
+          - Fn::Join:
+              - ''
+              - - '{"path":'
+                - '"https://s3.amazonaws.com/'
+                - !Select [ 5, !Split [ ":", !Ref CloudWatchConfigBucketARN ] ]
+                - '/config/standard/linux"'
+                - '}'
       AssociationName:
         Fn::Join:
         - ''
-        - - AWS-QuickSetup-SSMHostMgmt-UpdateCloudWatchAgent-
+        - - AWS-QuickSetup-SSMHostMgmt-ManageCloudWatchAgent-
           - Ref: QSConfigurationId
-      ScheduleExpression: rate(30 days)
+      ScheduleExpression:
+        Fn::If:
+        - UpdateCloudWatchAgentAssociation
+        - rate(30 days)
+        - !Ref 'AWS::NoValue'
       Targets:
         Fn::If:
         - IsOrgQuickSetup
@@ -1030,4 +1193,91 @@ Resources:
                       Fn::Split:
                       - ","
                       - Ref: TargetInstances
-    Condition: UpdateCloudWatchAgentAssociation
+    Condition: CreateInstallAndManageCloudWatchAgentAssociation
+#  UpdateCloudWatchDocument:
+#    Type: AWS::SSM::Document
+#    Properties:
+#      DocumentFormat: YAML
+#      Content:
+#        schemaVersion: '2.2'
+#        description: A composite document for updating CloudWatch agent.
+#        mainSteps:
+##        - precondition:
+##            StringEquals:
+##            - platformType
+##            - Linux
+##          action: aws:runShellScript
+##          name: first
+##          inputs:
+##            runCommand:
+##            - sleep 1800
+##        - precondition:
+##            StringEquals:
+##            - platformType
+##            - Windows
+##          action: aws:runPowerShellScript
+##          name: second
+##          inputs:
+##            runCommand:
+##            - Start-Sleep -Seconds 1800
+#        - action: aws:runDocument
+#          name: installCWAgent
+#          inputs:
+#            documentType: SSMDocument
+#            documentPath: AWS-ConfigureAWSPackage
+#            documentParameters: '{"action":"Install","name" : "AmazonCloudWatchAgent"}'
+#      DocumentType: Command
+##      Name:
+##        Fn::Join:
+##        - ''
+##        - - UpdateCloudWatchDocument-
+##          - Ref: QSConfigurationId
+#    Condition: UpdateCloudWatchAgentAssociation
+#  SystemAssociationForUpdateCloudWatchAgent:
+#    Type: AWS::SSM::Association
+#    Properties:
+#      ApplyOnlyAtCronInterval: true
+#      Name:
+#        Ref: UpdateCloudWatchDocument
+#      AssociationName:
+#        Fn::Join:
+#        - ''
+#        - - AWS-QuickSetup-SSMHostMgmt-UpdateCloudWatchAgent-
+#          - Ref: QSConfigurationId
+#      ScheduleExpression: rate(30 days)
+#      Targets:
+#        Fn::If:
+#        - IsOrgQuickSetup
+#        - - Key: InstanceIds
+#            Values:
+#            - "*"
+#        - Fn::If:
+#          - IsTagKeyAndValueTargeted
+#          - - Key:
+#                Fn::Join:
+#                - ''
+#                - - 'tag:'
+#                  - Ref: TargetTagKey
+#              Values:
+#              - Ref: TargetTagValue
+#          - Fn::If:
+#            - IsTagKeyOnlyTargeted
+#            - - Key: tag-key
+#                Values:
+#                - Ref: TargetTagKey
+#            - Fn::If:
+#              - IsResourceGroupTargeted
+#              - - Key: resource-groups:Name
+#                  Values:
+#                  - Ref: ResourceGroupName
+#              - Fn::If:
+#                - TargetAll
+#                - - Key: InstanceIds
+#                    Values:
+#                    - "*"
+#                - - Key: InstanceIds
+#                    Values:
+#                      Fn::Split:
+#                      - ","
+#                      - Ref: TargetInstances
+#    Condition: UpdateCloudWatchAgentAssociation

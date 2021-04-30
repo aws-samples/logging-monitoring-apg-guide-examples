@@ -42,7 +42,7 @@ Resources:
               StringEquals:
                 - platformType
                 - Windows
-            name: downloadStandardCloudWatchConfigWindows
+            name: DownloadStandardCloudWatchConfigWindows
             inputs:
               sourceType: S3
               sourceInfo: "{{ sourceInfoWindows }}"
@@ -52,7 +52,7 @@ Resources:
               StringEquals:
                 - platformType
                 - Windows
-            name: runShellScript
+            name: DeleteEtagFilesWindows
             inputs:
               timeoutSeconds: '60'
               runCommand:
@@ -96,7 +96,7 @@ Resources:
               StringEquals:
                 - platformType
                 - Linux
-            name: runShellScript
+            name: DeleteEtagFilesLinux
             inputs:
               timeoutSeconds: '60'
               runCommand:
