@@ -21,7 +21,7 @@ These resources are provided for you so that you can setup prerequisites and con
     * */config/standard/linux/onpremises*:  You can store your standard Linux CloudWatch platform configuration file here for on premises servers.  You may further categorize your standard platform configuration for different linux distributions, EC2 instance types, and environments.
     * */config/<application_name>*:  You can store your application specific CloudWatch configuration files here.  You may further categorize your applications with additional folders / prefixes for environments, etc
 
-  This template is intended to be used by [Customized AWS Systems Manager Setup with AWS CloudFormation](./custom_ssm_setup/) and [AWS Systems Manager Document to install /update the Amazon CloudWatch agent - configure from central S3 bucket](dev/builder/logging-monitoring-apg-guide-examples/custom_ssm_setup/InstallAndManageCloudWatchDocument.yaml)
+  This template is intended to be used by [Customized AWS Systems Manager Setup with AWS CloudFormation](./custom_ssm_setup/)
 
 * [Customized AWS Systems Manager Setup with AWS CloudFormation](./custom_ssm_setup/) - This CloudFormation template provides a customized deployment of the [AWS Systems Manager Quick Setup process](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-quick-setup.html) via CloudFormation.  This template includes customized SSM documents for deploying and updating your CloudWatch agents from a centralized S3 bucket.
 
