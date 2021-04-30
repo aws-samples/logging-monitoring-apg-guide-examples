@@ -1,28 +1,20 @@
 ## AWS Logging & Monitoring Example Resources
 The CloudFormation templates included in this repository are intended to assist you in configuring and installing Amazon CloudWatch and AWS X-Ray for on premises servers, Amazon EC2, Amazon ECS, and Amazon EKS. Templates are also provided for deploying ECS and EKS clusters and services with Amazon CloudWatch preconfigured.
 
+This repository supports guidance provided in the **Designing and implementing logging and monitoring with Amazon CloudWatch** APG guide.
+
 ## Resources Summary
-The example resources are listed here by the use case that they are intended to support.  A summary is provided of how the resource can be used to support you in implementing the use case.
+Example templates and code are described here by the use case that they are intended to support.  A summary is provided of how the resource can be used to support you in implementing the use case.
 
 ### Demo Resources
 These resources are provided for you so that you can setup prerequisites and configuration files to demo the Amazon CloudWatch agent, Amazon X-Ray, and the Embedded Metric Format.
 
 * [Sample VPC](./create_vpc_example.yaml) - This template can be used to deploy a sample Amazon VPC with a single public subnet.  It deploys an internet gateway, with a default route on the public subnet.  You need a VPC in order to deploy an Amazon EC2 instance.  The Amazon EC2 instance needs to access the public CloudWatch service endpoints.
 
-### [Amazon ECS Example Resources](./examples/ecs)
-This directory contains sample logging and monitoring resources for Amazon ECS.
+* [Sample CloudWatch Agent Configuration Files](./cloudwatch_agent_configs) - These CloudWatch agent json configuration files provide the CloudWatch agent predefined metric sets.  You can use them as a starting point for custom CloudWatch agent configuration.
 
-* [AWS IAM Role for ECS Container Instances](./examples/ecs/ecs_cluster_role.yaml) - This CloudFormation template deploys an IAM role that includes AWS managed policies for ECS, CloudWatch, and AWS Systems Manager.  This enables you to capture logs and custom Amazon EC2 metrics on your ECS container instances as well as manage the underlying EC2 instances with AWS Systems Manager.  It also enables you to connect to the container instances with AWS Systems Manager Session Manager.
+* [Amazon ECS Example Resources](./examples/ecs) - This directory contains sample logging and monitoring resources for Amazon ECS.
 
-* [ECS Cluster CloudFormation Template with the SSM agent and CloudWatch agent installed - Linux](./examples/ecs/ecs_cluster_with_cloudwatch_linux.yaml) - This CloudFormation template is similar to the template deployed through the AWS ECS service console when you create a new ECS cluster.  It is modified to automatically install / update the AWS Systems Manager agent and Amazon CloudWatch agent.  It enables you to further customize operational components that you may want to install and configure as a standard for your ECS clusters.
- 
-* [Deploying the CloudWatch Agent to Collect EC2 Instance-Level Metrics on Amazon ECS](./examples/ecs/cwagent-ecs-instance-metric-cfn.yaml) - This CloudFormation template aligns to the manual deployment and setup of the Amazon CloudWatch agent for Amazon ECS Container Instances.  The template deploys a service to the Amazon ECS cluster specified for the Amazon CloudWatch agent and configures it to collect and report metrics to Amazon CloudWatch. The customized template reads its CloudWatch configuration from an SSM parameter named **ecs-cwagent-daemon-service** in the account and region.  You can use the sample CloudWatch agent configuration files to create the CloudWatch agent configuration and store them in the **ecs-cwagent-daemon-service** parameter.  [Refer to the AWS documentation for more details.](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/deploy-container-insights-ECS-instancelevel.html#deploy-container-insights-ECS-instancelevel-manual)
-
-* [Firelens Example ECS Task Definition](./examples/ecs/ecs-task-nginx-firelense.json) - This json file provides an ECS task definition that can be used to demo FireLens with an nginx container.  You must update the **executionRoleArn** and **taskRoleArn** to a valid value within your account before use.
-
-* [Amazon ECS Container example using EMF with CloudWatch to transmit custom metrics](./examples/ecs/ecs_cw_emf_example) - This directory contains a working example for a python application that transmits metrics to the Amazon CloudWatch service in EMF format using the CloudWatch agent.  It includes a Dockerfile to create the container image and a task definition file to deploy it to ECS.  You must update the task definition for your environment.  Update the **image** parameter to the ECR repository where you deploy the image.  Update the **executionRoleArn** and **taskRoleArn** to your account values.
-
-* [Amazon ECS Container example using EMF with Firelens to transmit custom metrics](./examples/ecs/ecs_firelense_emf_example) - This directory contains a working example for a python application that transmits metrics to the Amazon CloudWatch service in EMF format using the Firelens agent.  It includes a Dockerfile to create the container image and a task definition file to deploy it to ECS.  You must update the task definition for your environment.  Update the **image** parameter to the ECR repository where you deploy the image.  Update the **executionRoleArn** and **taskRoleArn** to your account values.
 
 ### [Amazon EKS Resources](./examples/eks)
 This directory contains sample logging and monitoring resources for Amazon EKS.
@@ -68,7 +60,5 @@ This directory contains sample logging and monitoring resources for Amazon EKS.
 
 * [AWS Systems Manager Document to install /update the Amazon CloudWatch agent - configure from SSM Parameter Store](./ssm_single_region_single_account.yaml) - This CloudFormation template creates a customized AWS Systems Manager document with steps for Windows and Linux to install and update the Amazon CloudWatch agent.  It downloads the CloudWatch agent configuration from AWS Systems Manager Parameter Store parameters (AmazonCloudWatch-windows / AmazonCloudWatch-linux).  It may be more appropriate for single account, single region solutions because you must maintain the Amazon CloudWatch configuration data in parameter store in each region.  
 
-### Sample CloudWatch Agent Configuration Files
-These [CloudWatch agent json configuration files](./cloudwatch_agent_configs) provide the CloudWatch agent predefined metric sets.  You can use them as a starting point for custom CloudWatch agent configuration.
 
 
