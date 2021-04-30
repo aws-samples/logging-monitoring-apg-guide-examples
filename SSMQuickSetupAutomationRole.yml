@@ -1,0 +1,187 @@
+RoleForAutomation:
+  Type: AWS::IAM::Role
+  Properties:
+    AssumeRolePolicyDocument:
+      Version: '2012-10-17'
+      Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+              - ssm.amazonaws.com
+          Action:
+            - sts:AssumeRole
+    Policies:
+      - PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - iam:ListRoles
+                - config:DescribeConfigurationRecorders
+                - compute-optimizer:GetEnrollmentStatus
+                - support:DescribeTrustedAdvisorChecks
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - ssm:UpdateServiceSetting
+                - ssm:GetServiceSetting
+              Resource:
+                - Fn::Join:
+                    - ''
+                    - - 'arn:'
+                      - Ref: AWS::Partition
+                      - !Sub ":ssm:${AWS::Region}:${AWS::AccountId}:servicesetting/ssm/opsitem/ssm-patchmanager"
+                - Fn::Join:
+                    - ''
+                    - - 'arn:'
+                      - Ref: AWS::Partition
+                      - !Sub ":ssm:${AWS::Region}:${AWS::AccountId}:servicesetting/ssm/opsitem/EC2"
+                - Fn::Join:
+                    - ''
+                    - - 'arn:'
+                      - Ref: AWS::Partition
+                      - !Sub ":ssm:${AWS::Region}:${AWS::AccountId}:servicesetting/ssm/opsdata/ExplorerOnboarded"
+                - Fn::Join:
+                    - ''
+                    - - 'arn:'
+                      - Ref: AWS::Partition
+                      - !Sub ":ssm:${AWS::Region}:${AWS::AccountId}:servicesetting/ssm/opsdata/Association"
+                - Fn::Join:
+                    - ''
+                    - - 'arn:'
+                      - Ref: AWS::Partition
+                      - !Sub ":ssm:${AWS::Region}:${AWS::AccountId}:servicesetting/ssm/opsdata/ComputeOptimizer"
+                - Fn::Join:
+                    - ''
+                    - - 'arn:'
+                      - Ref: AWS::Partition
+                      - !Sub ":ssm:${AWS::Region}:${AWS::AccountId}:servicesetting/ssm/opsdata/ConfigCompliance"
+                - Fn::Join:
+                    - ''
+                    - - 'arn:'
+                      - Ref: AWS::Partition
+                      - !Sub ":ssm:${AWS::Region}:${AWS::AccountId}:servicesetting/ssm/opsdata/OpsData-TrustedAdvisor"
+                - Fn::Join:
+                    - ''
+                    - - 'arn:'
+                      - Ref: AWS::Partition
+                      - !Sub ":ssm:${AWS::Region}:${AWS::AccountId}:servicesetting/ssm/opsdata/SupportCenterCase"
+            - Effect: Allow
+              Action:
+                - iam:CreateServiceLinkedRole
+              Resource:
+                Fn::Join:
+                  - ''
+                  - - 'arn:'
+                    - Ref: AWS::Partition
+                    - !Sub ":iam::${AWS::AccountId}:role/aws-service-role/ssm."
+                    - Ref: AWS::URLSuffix
+                    - "/AWSServiceRoleForAmazonSSM"
+              Condition:
+                StringEquals:
+                  iam:AWSServiceName: ssm.amazonaws.com
+        PolicyName: SSMQuickSetupEnableExplorerInlinePolicy
+      - PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetAutomationExecution
+                - ec2:DescribeIamInstanceProfileAssociations
+                - ec2:DisassociateIamInstanceProfile
+                - ec2:DescribeInstances
+                - ssm:StartAutomationExecution
+                - iam:GetInstanceProfile
+                - iam:ListInstanceProfilesForRole
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - iam:AttachRolePolicy
+              Resource: "*"
+              Condition:
+                ArnEquals:
+                  iam:PolicyARN:
+                    - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+                    - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+                    - arn:aws:iam::aws:policy/AmazonSSMPatchAssociation
+            - Effect: Allow
+              Action:
+                - iam:AddRoleToInstanceProfile
+              Resource:
+                - Fn::Join:
+                    - ''
+                    - - 'arn:'
+                      - Ref: AWS::Partition
+                      - !Sub ":iam::${AWS::AccountId}:instance-profile/AmazonSSMRoleForInstancesQuickSetup"
+            - Effect: Allow
+              Action:
+                - ec2:AssociateIamInstanceProfile
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  ec2:NewInstanceProfile:
+
+                    - Fn::Join:
+                        - ''
+                        - - 'arn:'
+                          - Ref: AWS::Partition
+                          - !Sub ":iam::${AWS::AccountId}:instance-profile/AmazonSSMRoleForInstancesQuickSetup"
+            - Effect: Allow
+              Action:
+                - iam:CreateInstanceProfile
+              Resource:
+                - Fn::Join:
+                    - ''
+                    - - 'arn:'
+                      - Ref: AWS::Partition
+                      - !Sub ":iam::${AWS::AccountId}:instance-profile/AmazonSSMRoleForInstancesQuickSetup"
+            - Effect: Allow
+              Action:
+                - iam:PassRole
+                - iam:GetRole
+              Resource:
+                - Fn::Join:
+                    - ''
+                    - - 'arn:'
+                      - Ref: AWS::Partition
+                      - !Sub ":iam::${AWS::AccountId}:role/AmazonSSMRoleForInstancesQuickSetup"
+                - Fn::Join:
+                    - ''
+                    - - 'arn:'
+                      - Ref: AWS::Partition
+                      - !Sub ":iam::${AWS::AccountId}:role/AWS-QuickSetup-HostMgmtRole-"
+                      - Ref: AWS::Region
+                      - "-"
+                      - Ref: QSConfigurationId
+            - Effect: Allow
+              Action:
+                - iam:CreateRole
+              Resource:
+                - Fn::Join:
+                    - ''
+                    - - 'arn:'
+                      - Ref: AWS::Partition
+                      - !Sub ":iam::${AWS::AccountId}:role/AmazonSSMRoleForInstancesQuickSetup"
+            - Effect: Allow
+              Action:
+                - iam:PutRolePolicy
+              Resource:
+                - Fn::Join:
+                    - ''
+                    - - 'arn:'
+                      - Ref: AWS::Partition
+                      - !Sub ":iam::${AWS::AccountId}:role/AmazonSSMRoleForInstancesQuickSetup"
+        PolicyName:
+          Fn::Join:
+            - ''
+            - - AWS-QuickSetup-SSMHostMgmt-CreateAndAttachRoleInlinePolicy-
+              - Ref: AWS::Region
+              - "-"
+              - Ref: QSConfigurationId
+    RoleName:
+      Fn::Join:
+        - ''
+        - - AWS-QuickSetup-HostMgmtRole-
+          - Ref: AWS::Region
+          - "-"
+          - Ref: QSConfigurationId

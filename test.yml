@@ -1,0 +1,19 @@
+
+Resources:
+  SystemAssociationForInstallAndConfigureCloudWatchAgent:
+    Type: AWS::SSM::Association
+    Properties:
+      Name: document-uLiFQIWltidY
+#      AssociationName: TestAssociation
+      ScheduleExpression:
+        Ref: AWS::NoValue
+      Parameters:
+        sourceInfoLinux:
+          - '{"path":"https://s3.amazonaws.com/amazon-cloudwatch-config-704070799152/config/standard/linux"}'
+      Targets:
+          - Key: InstanceIds
+            Values:
+              - "*"
+
+
+
