@@ -1,7 +1,7 @@
 ## AWS Logging & Monitoring Example Resources
 The CloudFormation templates included in this repository are intended to assist you in configuring and installing Amazon CloudWatch and AWS X-Ray for on premises servers, Amazon EC2, Amazon ECS, and Amazon EKS. Templates are also provided for deploying ECS and EKS clusters and services with Amazon CloudWatch preconfigured.
 
-This repository supports guidance provided in the **Designing and implementing logging and monitoring with Amazon CloudWatch** APG guide.
+This repository supports guidance provided in the **[Designing and implementing logging and monitoring with Amazon CloudWatch](https://docs.aws.amazon.com/prescriptive-guidance/latest/implementing-logging-monitoring-cloudwatch/welcome.html?did=pg_card&trk=pg_card)** APG guide.
 
 ## Resources Summary
 Example templates and code are described here by the use case that they are intended to support.  A summary is provided of how the resource can be used to support you in implementing the use case.

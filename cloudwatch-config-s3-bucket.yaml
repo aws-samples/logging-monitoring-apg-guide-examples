@@ -1,3 +1,11 @@
+#  Once you have created the S3 bucket, you can create a key / folder prefix structure to store your CloudWatch configuration files.  You can use a folder structure such as this:
+#
+#  * */config/standard/windows/ec2*:  You can store your standard Windows CloudWatch platform configuration file here for EC2.  You may further categorize your standard platform configurations for different windows versions, EC2 instance types, and environments.
+#  * */config/standard/windows/onpremises*:  You can store your standard Windows CloudWatch platform configuration file here for on premises servers.  You may further categorize your standard platform configurations for different windows versions, EC2 instance types, and environments.
+#  * */config/standard/linux/ec2*:  You can store your standard Linux CloudWatch platform configuration file here for EC2.  You may further categorize your standard platform configuration for different linux distributions, EC2 instance types, and environments.
+#  * */config/standard/linux/onpremises*:  You can store your standard Linux CloudWatch platform configuration file here for on premises servers.  You may further categorize your standard platform configuration for different linux distributions, EC2 instance types, and environments.
+#  * */config/<application_name>*:  You can store your application specific CloudWatch configuration files here.  You may further categorize your applications with additional folders / prefixes for environments, etc
+
 ---
 Description: S3 bucket for cross account, cross region access to CloudWatch configuration files
 AWSTemplateFormatVersion: '2010-09-09'
