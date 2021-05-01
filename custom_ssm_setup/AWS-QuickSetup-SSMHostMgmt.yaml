@@ -362,6 +362,10 @@ Resources:
             Condition:
               StringEquals:
                 ec2:NewInstanceProfile:
+                  - Fn::If:
+                    - IsInstanceProfileProvided
+                    - !Ref ProvidedInstanceProfileName
+                    - !Ref AWS::NoValue
                   - Fn::Join:
                       - ''
                       - - 'arn:'
@@ -426,6 +430,135 @@ Resources:
           - Ref: AWS::Region
           - "-"
           - Ref: QSConfigurationId
+  UpdateExistingInstanceProfile:
+    Type: AWS::SSM::Document
+    Properties:
+      DocumentFormat: YAML
+      Content:
+        description: Composite document for Quick Setup Managing Instances association.
+          This document updates the user provided instance profile with roles and
+          policies
+        schemaVersion: '0.3'
+        assumeRole: "{{AutomationAssumeRole}}"
+        parameters:
+          AutomationAssumeRole:
+            type: String
+#          InstanceId:
+#            type: String
+          InstanceProfile:
+            type: String
+        mainSteps:
+          - name: getRoleFromInstanceProfile
+            action: aws:executeAwsApi
+            inputs:
+              Service: iam
+              Api: GetInstanceProfile
+              InstanceProfileName: "{{InstanceProfile}}"
+            outputs:
+              - Name: existingRoleName
+                Selector: "$.InstanceProfile.Roles[0].RoleName"
+                Type: String
+            nextStep: attachAmazonSSMManagedInstanceCoreToExistingRole
+          - name: attachAmazonSSMManagedInstanceCoreToExistingRole
+            action: aws:executeAwsApi
+            inputs:
+              Service: iam
+              Api: AttachRolePolicy
+              RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
+              PolicyArn: arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+            nextStep: !Sub "attachCloudWatchConfigS3BucketPolicyToExistingRole"
+          - inputs:
+              RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
+              PolicyArn: !Ref CloudWatchConfigS3BucketPolicy
+              Service: iam
+              Api: AttachRolePolicy
+            name: !Sub "attachCloudWatchConfigS3BucketPolicyToExistingRole"
+            action: aws:executeAwsApi
+            nextStep: attachCloudWatchAgentServerPolicyToExistingRole
+          - name: attachCloudWatchAgentServerPolicyToExistingRole
+            action: aws:executeAwsApi
+            inputs:
+              Service: iam
+              Api: AttachRolePolicy
+              RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
+              PolicyArn: arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+            nextStep: attachAmazonSSMPatchAssociationToExistingRole
+          - name: attachAmazonSSMPatchAssociationToExistingRole
+            action: aws:executeAwsApi
+            inputs:
+              Service: iam
+              Api: AttachRolePolicy
+              RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
+              PolicyArn: arn:aws:iam::aws:policy/AmazonSSMPatchAssociation
+            isEnd: true
+      DocumentType: Automation
+      Name:
+        Fn::Join:
+          - ''
+          - - AWSQuickSetup-UpdateExistingInstanceProfile-
+            - Ref: QSConfigurationId
+
+  SystemAssociationForUpdateManagingInstances:
+    Type: AWS::SSM::Association
+    Properties:
+      Name:
+        Ref: UpdateExistingInstanceProfile
+      AssociationName:
+        Fn::Join:
+          - ''
+          - - AWS-QuickSetup-SSMHostMgmt-UpdateIAMForInstanceMgmt-
+            - Ref: QSConfigurationId
+      Parameters:
+        AutomationAssumeRole:
+          - Fn::If:
+              - IsNoAutomationAssumeRoleProvided
+              - Fn::GetAtt:
+                  - RoleForAutomation
+                  - Arn
+              - Ref: ProvidedAssumeRoleArn
+        InstanceProfile:
+          - Ref: ProvidedInstanceProfileName
+    Condition: IsInstanceProfileProvided
+
+#      AutomationTargetParameterName: InstanceId
+#      Targets:
+#        Fn::If:
+#          - IsOrgQuickSetup
+#          - - Key: InstanceIds
+#              Values:
+#                - "*"
+#          - Fn::If:
+#              - IsTagKeyAndValueTargeted
+#              - - Key:
+#                    Fn::Join:
+#                      - ''
+#                      - - 'tag:'
+#                        - Ref: TargetTagKey
+#                  Values:
+#                    - Ref: TargetTagValue
+#              - Fn::If:
+#                  - IsTagKeyOnlyTargeted
+#                  - - Key: tag-key
+#                      Values:
+#                        - Ref: TargetTagKey
+#                  - Fn::If:
+#                      - IsResourceGroupTargeted
+#                      - - Key: ResourceGroup
+#                          Values:
+#                            - Ref: ResourceGroupName
+#                      - Fn::If:
+#                          - TargetAll
+#                          - - Key: InstanceIds
+#                              Values:
+#                                - "*"
+#                          - - Key: ParameterValues
+#                              Values:
+#                                Fn::Split:
+#                                  - ","
+#                                  - Ref: TargetInstances
+#      ScheduleExpression: rate(30 days)
+#    Condition: IsInstanceProfileProvided
+
   CreateAndAttachIAMToInstance:
     Type: AWS::SSM::Document
     Properties:
@@ -443,6 +576,9 @@ Resources:
             type: String
           IsPolicyAttachAllowed:
             type: String
+          ProvidedInstanceProfileName:
+            type: String
+            default: ''
         mainSteps:
         - name: getExistingRoleName
           action: aws:executeScript
@@ -469,7 +605,7 @@ Resources:
           action: aws:branch
           inputs:
             Choices:
-            - NextStep: createRoleIfNotExists
+            - NextStep: checkIfProvidedInstanceProfileName
               Variable: "{{getExistingRoleName.existingInstanceProfileRoleName}}"
               StringEquals: NoRoleFound
             Default: checkIfPolicyAttachAllowed
@@ -524,6 +660,26 @@ Resources:
             RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
             PolicyArn: arn:aws:iam::aws:policy/AmazonSSMPatchAssociation
           isEnd: true
+        - name: checkIfProvidedInstanceProfileName
+          action: aws:branch
+          inputs:
+            Choices:
+              - NextStep: createRoleIfNotExists
+                Variable: "{{ProvidedInstanceProfileName}}"
+                StringEquals: ''
+            Default: executeAttachProvidedInstanceProfileName
+        - name: executeAttachProvidedInstanceProfileName
+          action: aws:executeAutomation
+          maxAttempts: 20
+          timeoutSeconds: 2
+          inputs:
+            DocumentName: AWS-AttachIAMToInstance
+            RuntimeParameters:
+              RoleName: "{{ProvidedInstanceProfileName}}"
+              ForceReplace: false
+              AutomationAssumeRole: "{{ AutomationAssumeRole }}"
+              InstanceId: "{{ InstanceId }}"
+          isEnd: true
         - name: createRoleIfNotExists
           action: aws:executeAwsApi
           inputs:
@@ -533,8 +689,7 @@ Resources:
             RoleName: AmazonSSMRoleForInstancesQuickSetup
             AssumeRolePolicyDocument: '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
             Description: EC2 role for SSM for Quick-Setup
-          description: Create AmazonSSMRoleForInstancesQuickSetup Role For SSM Quick
-            Setup
+          description: Create AmazonSSMRoleForInstancesQuickSetup Role For SSM Quick Setup
           onFailure: Continue
           nextStep: assertRoleForInstanceProfileExists
         - name: assertRoleForInstanceProfileExists
@@ -614,73 +769,7 @@ Resources:
 #        - ''
 #        - - AWSQuickSetup-CreateAndAttachIAMToInstance-
 #          - Ref: QSConfigurationId
-  UpdateExistingInstanceProfile:
-    Type: AWS::SSM::Document
-    Properties:
-      DocumentFormat: YAML
-      Content:
-        description: Composite document for Quick Setup Managing Instances association.
-          This document updates the user provided instance profile with roles and
-          policies
-        schemaVersion: '0.3'
-        assumeRole: "{{AutomationAssumeRole}}"
-        parameters:
-          AutomationAssumeRole:
-            type: String
-          InstanceId:
-            type: String
-          InstanceProfile:
-            type: String
-        mainSteps:
-        - name: getRoleFromInstanceProfile
-          action: aws:executeAwsApi
-          inputs:
-            Service: iam
-            Api: GetInstanceProfile
-            InstanceProfileName: "{{InstanceProfile}}"
-          outputs:
-          - Name: existingRoleName
-            Selector: "$.InstanceProfile.Roles[0].RoleName"
-            Type: String
-          nextStep: attachAmazonSSMManagedInstanceCoreToExistingRole
-        - name: attachAmazonSSMManagedInstanceCoreToExistingRole
-          action: aws:executeAwsApi
-          inputs:
-            Service: iam
-            Api: AttachRolePolicy
-            RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
-            PolicyArn: arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-          nextStep: !Sub "attachCloudWatchConfigS3BucketPolicyToExistingRole"
-        - inputs:
-            RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
-            PolicyArn: !Ref CloudWatchConfigS3BucketPolicy
-            Service: iam
-            Api: AttachRolePolicy
-          name: !Sub "attachCloudWatchConfigS3BucketPolicyToExistingRole"
-          action: aws:executeAwsApi
-          nextStep: attachCloudWatchAgentServerPolicyToExistingRole
-        - name: attachCloudWatchAgentServerPolicyToExistingRole
-          action: aws:executeAwsApi
-          inputs:
-            Service: iam
-            Api: AttachRolePolicy
-            RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
-            PolicyArn: arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
-          nextStep: attachAmazonSSMPatchAssociationToExistingRole
-        - name: attachAmazonSSMPatchAssociationToExistingRole
-          action: aws:executeAwsApi
-          inputs:
-            Service: iam
-            Api: AttachRolePolicy
-            RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
-            PolicyArn: arn:aws:iam::aws:policy/AmazonSSMPatchAssociation
-          isEnd: true
-      DocumentType: Automation
-      Name:
-        Fn::Join:
-        - ''
-        - - AWSQuickSetup-UpdateExistingInstanceProfile-
-          - Ref: QSConfigurationId
+
   SystemAssociationForManagingInstances:
     Type: AWS::SSM::Association
     Properties:
@@ -688,115 +777,61 @@ Resources:
         Ref: CreateAndAttachIAMToInstance
       AssociationName:
         Fn::Join:
-        - ''
-        - - AWS-QuickSetup-SSMHostMgmt-AttachIAMToInstance-
-          - Ref: QSConfigurationId
+          - ''
+          - - AWS-QuickSetup-SSMHostMgmt-AttachIAMToInstance-
+            - Ref: QSConfigurationId
       Parameters:
         AutomationAssumeRole:
-        - Fn::If:
-          - IsNoAutomationAssumeRoleProvided
-          - Fn::GetAtt:
-            - RoleForAutomation
-            - Arn
-          - Ref: ProvidedAssumeRoleArn
+          - Fn::If:
+              - IsNoAutomationAssumeRoleProvided
+              - Fn::GetAtt:
+                  - RoleForAutomation
+                  - Arn
+              - Ref: ProvidedAssumeRoleArn
         IsPolicyAttachAllowed:
-        - Ref: IsPolicyAttachAllowed
+          - Ref: IsPolicyAttachAllowed
+        ProvidedInstanceProfileName:
+          - Ref: ProvidedInstanceProfileName
+
       AutomationTargetParameterName: InstanceId
       Targets:
         Fn::If:
-        - IsOrgQuickSetup
-        - - Key: InstanceIds
-            Values:
-            - "*"
-        - Fn::If:
-          - IsTagKeyAndValueTargeted
-          - - Key:
-                Fn::Join:
-                - ''
-                - - 'tag:'
-                  - Ref: TargetTagKey
+          - IsOrgQuickSetup
+          - - Key: InstanceIds
               Values:
-              - Ref: TargetTagValue
+                - "*"
           - Fn::If:
-            - IsTagKeyOnlyTargeted
-            - - Key: tag-key
-                Values:
-                - Ref: TargetTagKey
-            - Fn::If:
-              - IsResourceGroupTargeted
-              - - Key: ResourceGroup
+              - IsTagKeyAndValueTargeted
+              - - Key:
+                    Fn::Join:
+                      - ''
+                      - - 'tag:'
+                        - Ref: TargetTagKey
                   Values:
-                  - Ref: ResourceGroupName
+                    - Ref: TargetTagValue
               - Fn::If:
-                - TargetAll
-                - - Key: InstanceIds
-                    Values:
-                    - "*"
-                - - Key: ParameterValues
-                    Values:
-                      Fn::Split:
-                      - ","
-                      - Ref: TargetInstances
+                  - IsTagKeyOnlyTargeted
+                  - - Key: tag-key
+                      Values:
+                        - Ref: TargetTagKey
+                  - Fn::If:
+                      - IsResourceGroupTargeted
+                      - - Key: ResourceGroup
+                          Values:
+                            - Ref: ResourceGroupName
+                      - Fn::If:
+                          - TargetAll
+                          - - Key: InstanceIds
+                              Values:
+                                - "*"
+                          - - Key: ParameterValues
+                              Values:
+                                Fn::Split:
+                                  - ","
+                                  - Ref: TargetInstances
       ScheduleExpression: rate(30 days)
     Condition: IsNoInstanceProfileProvided
-  SystemAssociationForUpdateManagingInstances:
-    Type: AWS::SSM::Association
-    Properties:
-      Name:
-        Ref: UpdateExistingInstanceProfile
-      AssociationName:
-        Fn::Join:
-        - ''
-        - - AWS-QuickSetup-SSMHostMgmt-UpdateIAMForInstanceMgmt-
-          - Ref: QSConfigurationId
-      Parameters:
-        AutomationAssumeRole:
-        - Fn::If:
-          - IsNoAutomationAssumeRoleProvided
-          - Fn::GetAtt:
-            - RoleForAutomation
-            - Arn
-          - Ref: ProvidedAssumeRoleArn
-        InstanceProfile:
-        - Ref: ProvidedInstanceProfileName
-      AutomationTargetParameterName: InstanceId
-      Targets:
-        Fn::If:
-        - IsOrgQuickSetup
-        - - Key: InstanceIds
-            Values:
-            - "*"
-        - Fn::If:
-          - IsTagKeyAndValueTargeted
-          - - Key:
-                Fn::Join:
-                - ''
-                - - 'tag:'
-                  - Ref: TargetTagKey
-              Values:
-              - Ref: TargetTagValue
-          - Fn::If:
-            - IsTagKeyOnlyTargeted
-            - - Key: tag-key
-                Values:
-                - Ref: TargetTagKey
-            - Fn::If:
-              - IsResourceGroupTargeted
-              - - Key: ResourceGroup
-                  Values:
-                  - Ref: ResourceGroupName
-              - Fn::If:
-                - TargetAll
-                - - Key: InstanceIds
-                    Values:
-                    - "*"
-                - - Key: ParameterValues
-                    Values:
-                      Fn::Split:
-                      - ","
-                      - Ref: TargetInstances
-      ScheduleExpression: rate(30 days)
-    Condition: IsInstanceProfileProvided
+
   SystemAssociationForEnablingExplorer:
     Type: AWS::SSM::Association
     Properties:
@@ -1157,7 +1192,7 @@ Resources:
         Fn::If:
         - UpdateCloudWatchAgentAssociation
         - rate(30 days)
-        - !Ref 'AWS::NoValue'
+        - !Ref AWS::NoValue
       Targets:
         Fn::If:
         - IsOrgQuickSetup
@@ -1281,3 +1316,50 @@ Resources:
 #                      - ","
 #                      - Ref: TargetInstances
 #    Condition: UpdateCloudWatchAgentAssociation
+#SystemAssociationForUpdateCloudWatchAgent:
+#  Type: AWS::SSM::Association
+#  Properties:
+#    Name:
+#      Ref: UpdateCloudWatchDocument
+#    AssociationName:
+#      Fn::Join:
+#        - ''
+#        - - AWS-QuickSetup-SSMHostMgmt-UpdateCloudWatchAgent-
+#          - Ref: QSConfigurationId
+#    ScheduleExpression: rate(30 days)
+#    Targets:
+#      Fn::If:
+#        - IsOrgQuickSetup
+#        - - Key: InstanceIds
+#            Values:
+#              - "*"
+#        - Fn::If:
+#            - IsTagKeyAndValueTargeted
+#            - - Key:
+#                  Fn::Join:
+#                    - ''
+#                    - - 'tag:'
+#                      - Ref: TargetTagKey
+#                Values:
+#                  - Ref: TargetTagValue
+#            - Fn::If:
+#                - IsTagKeyOnlyTargeted
+#                - - Key: tag-key
+#                    Values:
+#                      - Ref: TargetTagKey
+#                - Fn::If:
+#                    - IsResourceGroupTargeted
+#                    - - Key: resource-groups:Name
+#                        Values:
+#                          - Ref: ResourceGroupName
+#                    - Fn::If:
+#                        - TargetAll
+#                        - - Key: InstanceIds
+#                            Values:
+#                              - "*"
+#                        - - Key: InstanceIds
+#                            Values:
+#                              Fn::Split:
+#                                - ","
+#                                - Ref: TargetInstances
+#  Condition: UpdateCloudWatchAgentAssociation
