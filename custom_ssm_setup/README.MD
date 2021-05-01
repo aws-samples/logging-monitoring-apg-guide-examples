@@ -1,7 +1,7 @@
 
 
 ## [Customized AWS Systems Manager Setup with AWS CloudFormation](./AWS-QuickSetup-SSMHostMgmt.yaml)
-Please refer to the **[Designing and implementing logging and monitoring with Amazon CloudWatch](https://docs.aws.amazon.com/prescriptive-guidance/latest/implementing-logging-monitoring-cloudwatch/welcome.html?did=pg_card&trk=pg_card)** APG guide for context.  
+Please refer to the **[Installing the CloudWatch agent using Systems Manager Distributor and State Manager](https://docs.aws.amazon.com/prescriptive-guidance/latest/implementing-logging-monitoring-cloudwatch/install-cloudwatch-systems-manager.html)** section in the **[Designing and implementing logging and monitoring with Amazon CloudWatch](https://docs.aws.amazon.com/prescriptive-guidance/latest/implementing-logging-monitoring-cloudwatch/welcome.html?did=pg_card&trk=pg_card)** APG guide for context.  
 
 This CloudFormation template can be deployed as a stack for single region, single account deployment or as a StackSet for multi-account, multi-region deployment for S3 based deployment and update of CloudWatch Agent configurations for Amazon EC2 and on-premises servers.
 
