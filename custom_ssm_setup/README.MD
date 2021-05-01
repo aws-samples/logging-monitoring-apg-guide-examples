@@ -1,5 +1,4 @@
 
-
 ## [Customized AWS Systems Manager Setup with AWS CloudFormation](./AWS-QuickSetup-SSMHostMgmt.yaml)
 Please refer to the **[Installing the CloudWatch agent using Systems Manager Distributor and State Manager](https://docs.aws.amazon.com/prescriptive-guidance/latest/implementing-logging-monitoring-cloudwatch/install-cloudwatch-systems-manager.html)** section in the **[Designing and implementing logging and monitoring with Amazon CloudWatch](https://docs.aws.amazon.com/prescriptive-guidance/latest/implementing-logging-monitoring-cloudwatch/welcome.html?did=pg_card&trk=pg_card)** APG guide for context.  
 
@@ -29,3 +28,14 @@ In general, the following changes have been made from the standard AWS SSM Quick
 * The **UpdateCloudWatchDocument** SSM document and related SSM association has been commented out.  This is handled collectively by the **InstallAndManageCloudWatchDocument** SSM document and **SystemAssociationForInstallAndConfigureCloudWatchAgent** SSM association.     
 * The **InstallAndManageCloudWatchDocument** SSM document has been updated with additional steps to download CloudWatch configuration files from the S3 bucket containing your standard CloudWatch configurations. Steps are added to stop and restart the CloudWatch agent after the configuration files are downloaded.
 * The **SystemAssociationForInstallAndConfigureCloudWatchAgent** SSM association to the **InstallAndManageCloudWatchDocument** SSM document has been updated to include parameters specifying the CloudWatch S3 configuration bucket.
+
+## Individual Custom SSM documents
+These customized versions of the SSM documents created by Quick Setup can be used separately if you don't want to use the [AWS-QuickSetup-SSMHostMgmt.yaml](./AWS-QuickSetup-SSMHostMgmt.yaml) CloudFormation template.
+
+### SSM automation document to create / update standard SSM & CloudWatch IAM instance profile - [CreateAndAttachIAMToInstance.yaml](./CreateAndAttachIAMToInstance.yaml)
+This customized SSM document is created by SSM Quick Setup to deploy an IAM instance profile to provide the necessary permissions for SSM.  This updated version of the document includes the necessary permissions for Amazon CloudWatch as well as a common CloudWatch S3 configuration bucket.  
+
+You will need to update the placeholder, **\<Include ARN for S3 IAM policy here\>** with an IAM policy that will provide access to your CloudWatch S3 configuration bucket.  You can use the example policy defined in the [AWS-QuickSetup-SSMHostMgmt.yaml](./AWS-QuickSetup-SSMHostMgmt.yaml) CloudFormation template. 
+
+### Updated IAM instance profile SSM document - [InstallAndManageCloudWatchDocument.yaml](./InstallAndManageCloudWatchDocument.yaml)
+This customized SSM document is created by  SSM Quick Setup to deploy and configure the CloudWatch agent.  This updated version of the document includes customizations to deploy and configure standard CloudWatch configurations from an S3 bucket.  
