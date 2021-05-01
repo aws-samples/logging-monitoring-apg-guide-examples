@@ -81,7 +81,7 @@ mainSteps:
     nextStep: attachCloudWatchConfigS3BucketPolicyToExistingRole
   - inputs:
       RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
-      PolicyArn: !Ref CloudWatchConfigS3BucketPolicy
+      PolicyArn: <Include ARN for S3 IAM policy here>
       Service: iam
       Api: AttachRolePolicy
     name: attachCloudWatchConfigS3BucketPolicyToExistingRole
