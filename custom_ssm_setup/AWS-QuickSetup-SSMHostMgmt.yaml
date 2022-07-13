@@ -1085,7 +1085,8 @@ Resources:
           inputs:
             timeoutSeconds: '60'
             runCommand:
-              - del /f C:\\ProgramData\\Amazon\\AmazonCloudWatchAgent\\Configs\\*.etag
+              - cd C:\\ProgramData\\Amazon\\AmazonCloudWatchAgent\\Configs
+              - del /f /s *.etag
         - action: "aws:runDocument"
           precondition:
             StringEquals:
@@ -1129,7 +1130,8 @@ Resources:
           inputs:
             timeoutSeconds: '60'
             runCommand:
-              - rm -f /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/*.etag
+              - cd /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d
+              - find . -name \*.etag -type f -delete
         - action: "aws:runDocument"
           precondition:
             StringEquals:
