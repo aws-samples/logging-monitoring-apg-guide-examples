@@ -113,7 +113,8 @@ mainSteps:
     inputs:
       timeoutSeconds: '60'
       runCommand:
-        - rm -f /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/*.etag
+        - cd /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d
+        - find . -name \*.etag -type f -delete
   - action: "aws:runDocument"
     precondition:
       StringEquals:
