@@ -69,7 +69,8 @@ mainSteps:
     inputs:
       timeoutSeconds: '60'
       runCommand:
-        - del /f C:\\ProgramData\\Amazon\\AmazonCloudWatchAgent\\Configs\\*.etag
+        - cd C:\\ProgramData\\Amazon\\AmazonCloudWatchAgent\\Configs
+        - del /f /s *.etag
   - action: "aws:runDocument"
     precondition:
       StringEquals:
