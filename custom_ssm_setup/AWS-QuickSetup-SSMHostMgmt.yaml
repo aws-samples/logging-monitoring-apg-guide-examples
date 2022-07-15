@@ -1066,6 +1066,30 @@ Resources:
             documentParameters:
               action: Install
               name: AmazonCloudWatchAgent
+        - action: "aws:runDocument"
+          precondition:
+            StringEquals:
+              - platformType
+              - Windows
+          name: "StartCloudWatchWindows"
+          inputs:
+            documentType: "SSMDocument"
+            documentPath: "AmazonCloudWatch-ManageAgent"
+            documentParameters:
+              action: "start"
+              mode: "ec2"
+        - action: "aws:runDocument"
+          precondition:
+            StringEquals:
+              - platformType
+              - Windows
+          name: "StopCloudWatchWindows"
+          inputs:
+            documentType: "SSMDocument"
+            documentPath: "AmazonCloudWatch-ManageAgent"
+            documentParameters:
+              action: "stop"
+              mode: "ec2"
         - action: aws:downloadContent
           precondition:
             StringEquals:
@@ -1092,24 +1116,36 @@ Resources:
             StringEquals:
               - platformType
               - Windows
-          name: "StopCloudWatchWindows"
-          inputs:
-            documentType: "SSMDocument"
-            documentPath: "AmazonCloudWatch-ManageAgent"
-            documentParameters:
-              action: "stop"
-              mode: "ec2"
-        - action: "aws:runDocument"
-          precondition:
-            StringEquals:
-              - platformType
-              - Windows
           name: "StartCloudWatchWindows"
           inputs:
             documentType: "SSMDocument"
             documentPath: "AmazonCloudWatch-ManageAgent"
             documentParameters:
               action: "start"
+              mode: "ec2"
+        - action: "aws:runDocument"
+          precondition:
+            StringEquals:
+              - platformType
+              - Linux
+          name: "StartCloudWatchLinux"
+          inputs:
+            documentType: "SSMDocument"
+            documentPath: "AmazonCloudWatch-ManageAgent"
+            documentParameters:
+              action: "start"
+              mode: "ec2"
+        - action: "aws:runDocument"
+          precondition:
+            StringEquals:
+              - platformType
+              - Linux
+          name: "StopCloudWatchLinux"
+          inputs:
+            documentType: "SSMDocument"
+            documentPath: "AmazonCloudWatch-ManageAgent"
+            documentParameters:
+              action: "stop"
               mode: "ec2"
         - action: aws:downloadContent
           precondition:
@@ -1132,18 +1168,6 @@ Resources:
             runCommand:
               - cd /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d
               - find . -name \*.etag -type f -delete
-        - action: "aws:runDocument"
-          precondition:
-            StringEquals:
-              - platformType
-              - Linux
-          name: "StopCloudWatchLinux"
-          inputs:
-            documentType: "SSMDocument"
-            documentPath: "AmazonCloudWatch-ManageAgent"
-            documentParameters:
-              action: "stop"
-              mode: "ec2"
         - action: "aws:runDocument"
           precondition:
             StringEquals:
