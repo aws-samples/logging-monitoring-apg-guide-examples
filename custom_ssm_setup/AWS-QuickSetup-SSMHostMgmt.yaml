@@ -1116,7 +1116,7 @@ Resources:
             StringEquals:
               - platformType
               - Windows
-          name: "StartCloudWatchWindows"
+          name: "StartCloudWatchWindows2"
           inputs:
             documentType: "SSMDocument"
             documentPath: "AmazonCloudWatch-ManageAgent"
@@ -1173,7 +1173,7 @@ Resources:
             StringEquals:
               - platformType
               - Linux
-          name: "StartCloudWatchLinux"
+          name: "StartCloudWatchLinux2"
           inputs:
             documentType: "SSMDocument"
             documentPath: "AmazonCloudWatch-ManageAgent"
