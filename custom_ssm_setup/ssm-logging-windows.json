@@ -1,0 +1,14 @@
+{
+  "logs":
+   {
+       "logs_collected": {
+           "files": {
+               "collect_list": [
+                   {
+                       "file_path": "c:\\ProgramData\\Amazon\\SSM\\Logs\\amazon-ssm-agent.log"
+                   }
+               ]
+           }          
+       }
+  }
+}
