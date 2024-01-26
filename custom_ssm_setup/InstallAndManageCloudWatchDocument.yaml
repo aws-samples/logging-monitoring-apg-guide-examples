@@ -70,7 +70,7 @@ mainSteps:
       timeoutSeconds: '60'
       runCommand:
         - cd C:\\ProgramData\\Amazon\\AmazonCloudWatchAgent\\Configs
-        - remove-item '*.etag' -recurse -force
+        - Get-ChildItem -Path ".\*.etag"  -Recurse | Remove-Item
   - action: "aws:runDocument"
     precondition:
       StringEquals:
