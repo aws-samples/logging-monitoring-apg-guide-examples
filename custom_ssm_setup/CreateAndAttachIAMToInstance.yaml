@@ -1,8 +1,8 @@
 ---
 schemaVersion: '0.3'
-description: Composite document for Quick Setup Managing Instances association.
-  This document ensures IAM role for instance profile is created in account
-  with all required policies
+description: Composite document for Quick Setup Managing Instances association. This
+  document ensures IAM role for instance profile is created in account with all required
+  policies
 assumeRole: "{{AutomationAssumeRole}}"
 parameters:
   AutomationAssumeRole:
@@ -11,190 +11,136 @@ parameters:
     type: String
   IsPolicyAttachAllowed:
     type: String
-  ProvidedInstanceProfileName:
-    type: String
-    default: ''
 mainSteps:
-  - name: getExistingRoleName
-    action: aws:executeScript
+  - outputs:
+      - Type: String
+        Name: existingInstanceProfileRoleName
+        Selector: "$.Payload.RoleName"
+    maxAttempts: 3
     inputs:
-      Runtime: python3.6
-      Handler: getInstanceProfileName
-      InputPayload:
-        InstanceId: "{{InstanceId}}"
       Script: |-
         import boto3
-
+        
         def getInstanceProfileName(events, context):
             ec2_client = boto3.client("ec2")
             response = ec2_client.describe_instances(InstanceIds=[events["InstanceId"]])
             if 'IamInstanceProfile' in response['Reservations'][0]['Instances'][0]:
-                return {'RoleName': response['Reservations'][0]['Instances'][0]['IamInstanceProfile']['Arn'].split('instance-profile/')[1]}
+                return {'RoleName': response['Reservations'][0]['Instances'][0]['IamInstanceProfile']['Arn'].split('/').pop()}
             return {'RoleName': 'NoRoleFound'}
-    outputs:
-      - Name: existingInstanceProfileRoleName
-        Selector: "$.Payload.RoleName"
-        Type: String
+      Runtime: python3.8
+      InputPayload:
+        InstanceId: "{{InstanceId}}"
+      Handler: getInstanceProfileName
+    name: getExistingRoleName
+    action: aws:executeScript
     nextStep: branchIfProfileExists
-  - name: branchIfProfileExists
-    action: aws:branch
-    inputs:
+  - inputs:
       Choices:
-        - NextStep: checkIfProvidedInstanceProfileName
+        - StringEquals: NoRoleFound
           Variable: "{{getExistingRoleName.existingInstanceProfileRoleName}}"
-          StringEquals: NoRoleFound
+          NextStep: createRoleIfNotExists
       Default: checkIfPolicyAttachAllowed
-  - name: checkIfPolicyAttachAllowed
+    name: branchIfProfileExists
     action: aws:branch
-    inputs:
+  - inputs:
       Choices:
-        - NextStep: getRoleFromInstanceProfile
+        - StringEquals: 'true'
           Variable: "{{IsPolicyAttachAllowed}}"
-          StringEquals: 'true'
+          NextStep: getRoleFromInstanceProfile
       Default: createRoleIfNotExists
-  - name: getRoleFromInstanceProfile
-    action: aws:executeAwsApi
+    name: checkIfPolicyAttachAllowed
+    action: aws:branch
+  - outputs:
+      - Type: String
+        Name: existingRoleName
+        Selector: "$.InstanceProfile.Roles[0].RoleName"
     inputs:
+      InstanceProfileName: "{{getExistingRoleName.existingInstanceProfileRoleName}}"
       Service: iam
       Api: GetInstanceProfile
-      InstanceProfileName: "{{getExistingRoleName.existingInstanceProfileRoleName}}"
-    outputs:
-      - Name: existingRoleName
-        Selector: "$.InstanceProfile.Roles[0].RoleName"
-        Type: String
-    nextStep: attachAmazonSSMManagedInstanceCoreToExistingRole
-  - name: attachAmazonSSMManagedInstanceCoreToExistingRole
+    name: getRoleFromInstanceProfile
     action: aws:executeAwsApi
-    inputs:
-      Service: iam
-      Api: AttachRolePolicy
+    nextStep: attachAmazonSSMManagedInstanceCoreToExistingRole
+  - inputs:
       RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
       PolicyArn: arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-    nextStep: attachCloudWatchAgentServerPolicyToExistingRole
-  - inputs:
-      RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
-      PolicyArn: arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
       Service: iam
       Api: AttachRolePolicy
-    name: attachCloudWatchAgentServerPolicyToExistingRole
-    action: aws:executeAwsApi
-    nextStep: attachCloudWatchConfigS3BucketPolicyToExistingRole
-  - inputs:
-      RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
-      PolicyArn: <Include ARN for S3 IAM policy here>
-      Service: iam
-      Api: AttachRolePolicy
-    name: attachCloudWatchConfigS3BucketPolicyToExistingRole
+    name: attachAmazonSSMManagedInstanceCoreToExistingRole
     action: aws:executeAwsApi
     nextStep: attachAmazonSSMPatchAssociationToExistingRole
-  - name: attachAmazonSSMPatchAssociationToExistingRole
-    action: aws:executeAwsApi
-    inputs:
-      Service: iam
-      Api: AttachRolePolicy
+  - inputs:
       RoleName: "{{getRoleFromInstanceProfile.existingRoleName}}"
       PolicyArn: arn:aws:iam::aws:policy/AmazonSSMPatchAssociation
-    isEnd: true
-  - name: checkIfProvidedInstanceProfileName
-    action: aws:branch
-    inputs:
-      Choices:
-        - NextStep: createRoleIfNotExists
-          Variable: "{{ProvidedInstanceProfileName}}"
-          StringEquals: ''
-      Default: executeAttachProvidedInstanceProfileName
-  - name: executeAttachProvidedInstanceProfileName
-    action: aws:executeAutomation
-    maxAttempts: 20
-    timeoutSeconds: 2
-    inputs:
-      DocumentName: AWS-AttachIAMToInstance
-      RuntimeParameters:
-        RoleName: "{{ProvidedInstanceProfileName}}"
-        ForceReplace: false
-        AutomationAssumeRole: "{{ AutomationAssumeRole }}"
-        InstanceId: "{{ InstanceId }}"
-    isEnd: true
-  - name: createRoleIfNotExists
-    action: aws:executeAwsApi
-    inputs:
       Service: iam
-      Api: CreateRole
+      Api: AttachRolePolicy
+    name: attachAmazonSSMPatchAssociationToExistingRole
+    action: aws:executeAwsApi
+    isEnd: true
+  - inputs:
       Path: "/"
       RoleName: AmazonSSMRoleForInstancesQuickSetup
-      AssumeRolePolicyDocument: '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
       Description: EC2 role for SSM for Quick-Setup
+      AssumeRolePolicyDocument: '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
+      Service: iam
+      Api: CreateRole
+    name: createRoleIfNotExists
+    action: aws:executeAwsApi
     description: Create AmazonSSMRoleForInstancesQuickSetup Role For SSM Quick Setup
     onFailure: Continue
     nextStep: assertRoleForInstanceProfileExists
-  - name: assertRoleForInstanceProfileExists
-    action: aws:assertAwsResourceProperty
-    inputs:
-      Service: iam
-      Api: GetRole
+  - inputs:
       PropertySelector: "$.Role.RoleName"
+      RoleName: AmazonSSMRoleForInstancesQuickSetup
       DesiredValues:
         - AmazonSSMRoleForInstancesQuickSetup
-      RoleName: AmazonSSMRoleForInstancesQuickSetup
-    nextStep: attachAmazonSSMManagedInstanceCoreToRole
-  - name: attachAmazonSSMManagedInstanceCoreToRole
-    action: aws:executeAwsApi
-    inputs:
       Service: iam
-      Api: AttachRolePolicy
+      Api: GetRole
+    name: assertRoleForInstanceProfileExists
+    action: aws:assertAwsResourceProperty
+    nextStep: attachAmazonSSMManagedInstanceCoreToRole
+  - inputs:
       RoleName: AmazonSSMRoleForInstancesQuickSetup
       PolicyArn: arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-    nextStep: attachCloudWatchAgentServerPolicyToRole
-  - inputs:
-      RoleName: AmazonSSMRoleForInstancesQuickSetup
-      PolicyArn: arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
       Service: iam
       Api: AttachRolePolicy
-    name: attachCloudWatchAgentServerPolicyToRole
-    action: aws:executeAwsApi
-    nextStep: attachCloudWatchConfigS3BucketPolicyToRole
-  - inputs:
-      RoleName: AmazonSSMRoleForInstancesQuickSetup
-      PolicyArn: !Ref CloudWatchConfigS3BucketPolicy
-      Service: iam
-      Api: AttachRolePolicy
-    name: attachCloudWatchConfigS3BucketPolicyToRole
+    name: attachAmazonSSMManagedInstanceCoreToRole
     action: aws:executeAwsApi
     nextStep: attachAmazonSSMPatchAssociationToRole
-  - name: attachAmazonSSMPatchAssociationToRole
-    action: aws:executeAwsApi
-    inputs:
-      Service: iam
-      Api: AttachRolePolicy
+  - inputs:
       RoleName: AmazonSSMRoleForInstancesQuickSetup
       PolicyArn: arn:aws:iam::aws:policy/AmazonSSMPatchAssociation
-    nextStep: createInstanceProfileIfNotExists
-  - name: createInstanceProfileIfNotExists
+      Service: iam
+      Api: AttachRolePolicy
+    name: attachAmazonSSMPatchAssociationToRole
     action: aws:executeAwsApi
-    inputs:
+    nextStep: createInstanceProfileIfNotExists
+  - inputs:
       InstanceProfileName: AmazonSSMRoleForInstancesQuickSetup
       Service: iam
       Api: CreateInstanceProfile
+    name: createInstanceProfileIfNotExists
+    action: aws:executeAwsApi
     onFailure: Continue
     nextStep: addRoleToInstanceProfile
-  - name: addRoleToInstanceProfile
-    action: aws:executeAwsApi
-    inputs:
-      InstanceProfileName: AmazonSSMRoleForInstancesQuickSetup
+  - inputs:
       RoleName: AmazonSSMRoleForInstancesQuickSetup
+      InstanceProfileName: AmazonSSMRoleForInstancesQuickSetup
       Service: iam
       Api: AddRoleToInstanceProfile
+    name: addRoleToInstanceProfile
+    action: aws:executeAwsApi
     onFailure: Continue
     nextStep: executeAttachIAMToInstance
-  - name: executeAttachIAMToInstance
-    action: aws:executeAutomation
-    maxAttempts: 20
-    timeoutSeconds: 2
+  - maxAttempts: 10
     inputs:
-      DocumentName: AWS-AttachIAMToInstance
       RuntimeParameters:
-        RoleName: AmazonSSMRoleForInstancesQuickSetup
-        ForceReplace: false
         AutomationAssumeRole: "{{ AutomationAssumeRole }}"
+        RoleName: AmazonSSMRoleForInstancesQuickSetup
         InstanceId: "{{ InstanceId }}"
+        ForceReplace: false
+      DocumentName: AWS-AttachIAMToInstance
+    name: executeAttachIAMToInstance
+    action: aws:executeAutomation
+    timeoutSeconds: 60
     isEnd: true
